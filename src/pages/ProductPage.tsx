@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatRupiah } from '@/lib/currency'
 import { listProducts, type Product } from '@/lib/products'
 
 export function ProductPage() {
@@ -54,7 +55,7 @@ export function ProductPage() {
                 <TableCell>{product.sku_name}</TableCell>
                 <TableCell>{product.unit}</TableCell>
                 <TableCell className="text-right">
-                  {product.suggested_price ?? '-'}
+                  {product.suggested_price != null ? formatRupiah(product.suggested_price) : '-'}
                 </TableCell>
                 <TableCell>{product.is_active ? 'Active' : 'Inactive'}</TableCell>
               </TableRow>

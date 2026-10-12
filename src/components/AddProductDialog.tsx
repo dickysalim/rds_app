@@ -11,7 +11,17 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { formatRupiahInput } from '@/lib/currency'
 import { createProduct, type Product } from '@/lib/products'
+
+const UNIT_OPTIONS = ['pcs', 'box', 'lusin', 'kodi', 'rim', 'pack', 'kg', 'gram', 'liter', 'meter', 'roll', 'set']
 
 export function AddProductDialog({ onCreated }: { onCreated: (product: Product) => void }) {
   const [open, setOpen] = useState(false)
@@ -36,7 +46,7 @@ export function AddProductDialog({ onCreated }: { onCreated: (product: Product) 
       const product = await createProduct({
         sku_name: skuName,
         unit,
-        suggested_price: suggestedPrice ? Number(suggestedPrice) : null,
+        suggested_price: suggestedPrice ? Number(suggestedPrice.replace(/\D/g, '')) : null,
       })
       onCreated(product)
       setOpen(false)
@@ -76,17 +86,33 @@ export function AddProductDialog({ onCreated }: { onCreated: (product: Product) 
           </div>
           <div className="space-y-2">
             <Label htmlFor="unit">Unit</Label>
-            <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} required />
+            <Select value={unit} onValueChange={setUnit} required>
+              <SelectTrigger id="unit" className="w-full">
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {UNIT_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="suggested_price">Suggested Price</Label>
-            <Input
-              id="suggested_price"
-              type="number"
-              min="0"
-              value={suggestedPrice}
-              onChange={(e) => setSuggestedPrice(e.target.value)}
-            />
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                Rp
+              </span>
+              <Input
+                id="suggested_price"
+                inputMode="numeric"
+                className="pl-9"
+                value={suggestedPrice}
+                onChange={(e) => setSuggestedPrice(formatRupiahInput(e.target.value))}
+              />
+            </div>
           </div>
           {error && <p className="text-destructive text-sm">{error}</p>}
         </form>
