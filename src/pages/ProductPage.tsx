@@ -80,21 +80,20 @@ export function ProductPage() {
           <TableRow>
             <TableHead>SKU ID</TableHead>
             <TableHead>SKU Name</TableHead>
-            <TableHead className="text-right">Suggested Price</TableHead>
-            <TableHead>Unit</TableHead>
+            <TableHead className="text-right">Suggested Price / Unit</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : products.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 No products yet.
               </TableCell>
             </TableRow>
@@ -104,9 +103,10 @@ export function ProductPage() {
                 <TableCell>{product.sku_id}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>
                 <TableCell className="text-right">
-                  {product.suggested_price != null ? formatRupiah(product.suggested_price) : '-'}
+                  {product.suggested_price != null
+                    ? `${formatRupiah(product.suggested_price)} / ${product.unit}`
+                    : `- / ${product.unit}`}
                 </TableCell>
-                <TableCell>{product.unit}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
