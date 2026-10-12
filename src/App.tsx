@@ -1,41 +1,55 @@
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { AppLayout } from '@/components/AppLayout'
+import { LoginForm } from '@/components/LoginForm'
+import { HomePage } from '@/pages/HomePage'
+import { NotaPage } from '@/pages/NotaPage'
+import { CustomerPage } from '@/pages/CustomerPage'
+import { ProductPage } from '@/pages/ProductPage'
+import { fetchCurrentUser, logout, type AuthUser } from '@/lib/auth'
+import { getToken } from '@/lib/api'
 
 function App() {
-  return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            RDS Factory Management
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Vite + React + TypeScript + Tailwind + shadcn/ui
-          </p>
-        </div>
-        <Badge variant="secondary">v0.1.0</Badge>
-      </header>
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [checking, setChecking] = useState(true)
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Starter</CardTitle>
-          <CardDescription>
-            This page exists to confirm the UI toolkit is wired up. Replace it
-            with real views as the app is built out.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button>Primary action</Button>
-        </CardContent>
-      </Card>
-    </div>
+  useEffect(() => {
+    if (!getToken()) {
+      setChecking(false)
+      return
+    }
+    fetchCurrentUser()
+      .then(setUser)
+      .finally(() => setChecking(false))
+  }, [])
+
+  if (checking) return null
+
+  if (!user) {
+    return <LoginForm onLogin={setUser} />
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          element={
+            <AppLayout
+              user={user}
+              onLogout={() => {
+                logout()
+                setUser(null)
+              }}
+            />
+          }
+        >
+          <Route path="/" element={<HomePage />} />
+          <Route path="/nota" element={<NotaPage />} />
+          <Route path="/customer" element={<CustomerPage />} />
+          <Route path="/product" element={<ProductPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
 
