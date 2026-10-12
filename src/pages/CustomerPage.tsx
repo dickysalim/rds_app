@@ -1,5 +1,23 @@
+import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { AddCustomerDialog } from '@/components/AddCustomerDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { CustomerDialog } from '@/components/CustomerDialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -8,11 +26,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { listCustomers, type Customer } from '@/lib/customers'
+import { deleteCustomer, listCustomers, type Customer } from '@/lib/customers'
 
 export function CustomerPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     listCustomers()
@@ -20,11 +42,39 @@ export function CustomerPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  function handleSaved(customer: Customer) {
+    setCustomers((prev) => {
+      const exists = prev.some((c) => c.customer_id === customer.customer_id)
+      return exists
+        ? prev.map((c) => (c.customer_id === customer.customer_id ? customer : c))
+        : [...prev, customer]
+    })
+  }
+
+  async function handleDelete() {
+    if (!deletingCustomer) return
+    setDeleting(true)
+    try {
+      await deleteCustomer(deletingCustomer.customer_id)
+      setCustomers((prev) => prev.filter((c) => c.customer_id !== deletingCustomer.customer_id))
+      setDeletingCustomer(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Customer</h1>
-        <AddCustomerDialog onCreated={(customer) => setCustomers((prev) => [...prev, customer])} />
+        <Button
+          onClick={() => {
+            setEditingCustomer(null)
+            setDialogOpen(true)
+          }}
+        >
+          + Add Customer
+        </Button>
       </div>
       <Table>
         <TableHeader>
@@ -32,20 +82,21 @@ export function CustomerPage() {
             <TableHead>Cust. ID</TableHead>
             <TableHead>Company Name</TableHead>
             <TableHead>Address</TableHead>
-            <TableHead>Primary Contact</TableHead>
+            <TableHead>Contact Person Name</TableHead>
             <TableHead>Phone</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : customers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 No customers yet.
               </TableCell>
             </TableRow>
@@ -60,11 +111,64 @@ export function CustomerPage() {
                   <TableCell>{customer.address ?? '-'}</TableCell>
                   <TableCell>{customer.contact_name ?? '-'}</TableCell>
                   <TableCell>{customer.phone_number ?? '-'}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingCustomer(customer)
+                            setDialogOpen(true)
+                          }}
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setDeletingCustomer(customer)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
               ))
           )}
         </TableBody>
       </Table>
+
+      <CustomerDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        customer={editingCustomer}
+        onSaved={handleSaved}
+      />
+
+      <AlertDialog
+        open={!!deletingCustomer}
+        onOpenChange={(open) => !open && setDeletingCustomer(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete customer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove "{deletingCustomer?.company_name}" from the customer list. This
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

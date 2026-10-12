@@ -32,3 +32,25 @@ export async function createCustomer(input: CustomerInput): Promise<Customer> {
   if (!res.ok || !data.customer) throw new Error(data.error ?? 'Failed to create customer')
   return data.customer
 }
+
+export async function updateCustomer(
+  customerId: number,
+  input: CustomerInput,
+): Promise<Customer> {
+  const res = await apiFetch(`/customers/${customerId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const data = (await res.json()) as { customer?: Customer; error?: string }
+  if (!res.ok || !data.customer) throw new Error(data.error ?? 'Failed to update customer')
+  return data.customer
+}
+
+export async function deleteCustomer(customerId: number): Promise<void> {
+  const res = await apiFetch(`/customers/${customerId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error ?? 'Failed to delete customer')
+  }
+}

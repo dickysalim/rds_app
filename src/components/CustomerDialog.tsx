@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -7,14 +7,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createCustomer, type Customer } from '@/lib/customers'
+import { createCustomer, updateCustomer, type Customer } from '@/lib/customers'
 
-export function AddCustomerDialog({ onCreated }: { onCreated: (customer: Customer) => void }) {
-  const [open, setOpen] = useState(false)
+export function CustomerDialog({
+  open,
+  onOpenChange,
+  customer,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  customer: Customer | null
+  onSaved: (customer: Customer) => void
+}) {
   const [companyName, setCompanyName] = useState('')
   const [address, setAddress] = useState('')
   const [contactName, setContactName] = useState('')
@@ -22,52 +30,51 @@ export function AddCustomerDialog({ onCreated }: { onCreated: (customer: Custome
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  function reset() {
-    setCompanyName('')
-    setAddress('')
-    setContactName('')
-    setPhoneNumber('')
-    setError(null)
-  }
+  useEffect(() => {
+    if (open) {
+      setCompanyName(customer?.company_name ?? '')
+      setAddress(customer?.address ?? '')
+      setContactName(customer?.contact_name ?? '')
+      setPhoneNumber(customer?.phone_number ?? '')
+      setError(null)
+    }
+  }, [open, customer])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const customer = await createCustomer({
+      const input = {
         company_name: companyName,
         address: address || null,
         contact_name: contactName,
         phone_number: phoneNumber,
-      })
-      onCreated(customer)
-      setOpen(false)
-      reset()
+      }
+      const saved = customer
+        ? await updateCustomer(customer.customer_id, input)
+        : await createCustomer(input)
+      onSaved(saved)
+      onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create customer')
+      setError(err instanceof Error ? err.message : 'Failed to save customer')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (!next) reset()
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button>+ Add Customer</Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Customer</DialogTitle>
-          <DialogDescription>Create a new customer with its primary contact.</DialogDescription>
+          <DialogTitle>{customer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+          <DialogDescription>
+            {customer
+              ? 'Update this customer and its primary contact.'
+              : 'Create a new customer with its primary contact.'}
+          </DialogDescription>
         </DialogHeader>
-        <form id="add-customer-form" className="space-y-4" onSubmit={handleSubmit}>
+        <form id="customer-form" className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="company_name">Company Name</Label>
             <Input
@@ -82,7 +89,7 @@ export function AddCustomerDialog({ onCreated }: { onCreated: (customer: Custome
             <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="contact_name">Primary Contact</Label>
+            <Label htmlFor="contact_name">Contact Person Name</Label>
             <Input
               id="contact_name"
               value={contactName}
@@ -103,7 +110,7 @@ export function AddCustomerDialog({ onCreated }: { onCreated: (customer: Custome
           {error && <p className="text-destructive text-sm">{error}</p>}
         </form>
         <DialogFooter>
-          <Button type="submit" form="add-customer-form" disabled={loading}>
+          <Button type="submit" form="customer-form" disabled={loading}>
             {loading ? 'Saving…' : 'Save'}
           </Button>
         </DialogFooter>
