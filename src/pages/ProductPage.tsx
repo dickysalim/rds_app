@@ -80,7 +80,7 @@ export function ProductPage() {
           <TableRow>
             <TableHead>SKU ID</TableHead>
             <TableHead>SKU Name</TableHead>
-            <TableHead className="text-right">Suggested Price / Unit</TableHead>
+            <TableHead className="min-w-56 text-left">Suggested Price / Unit</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -102,7 +102,7 @@ export function ProductPage() {
               <TableRow key={product.sku_id}>
                 <TableCell>{product.sku_id}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>
-                <TableCell className="text-right">
+                <TableCell>
                   {product.suggested_price != null
                     ? `${formatRupiah(product.suggested_price)} / ${product.unit}`
                     : `- / ${product.unit}`}
