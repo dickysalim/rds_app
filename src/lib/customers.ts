@@ -14,3 +14,21 @@ export async function listCustomers(): Promise<Customer[]> {
   const data = (await res.json()) as { customers: Customer[] }
   return data.customers
 }
+
+export interface CustomerInput {
+  company_name: string
+  address: string | null
+  contact_name: string
+  phone_number: string
+}
+
+export async function createCustomer(input: CustomerInput): Promise<Customer> {
+  const res = await apiFetch('/customers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const data = (await res.json()) as { customer?: Customer; error?: string }
+  if (!res.ok || !data.customer) throw new Error(data.error ?? 'Failed to create customer')
+  return data.customer
+}

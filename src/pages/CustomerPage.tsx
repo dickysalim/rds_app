@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AddCustomerDialog } from '@/components/AddCustomerDialog'
 import {
   Table,
   TableBody,
@@ -21,10 +22,14 @@ export function CustomerPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Customer</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Customer</h1>
+        <AddCustomerDialog onCreated={(customer) => setCustomers((prev) => [...prev, customer])} />
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Cust. ID</TableHead>
             <TableHead>Company Name</TableHead>
             <TableHead>Address</TableHead>
             <TableHead>Primary Contact</TableHead>
@@ -34,25 +39,29 @@ export function CustomerPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : customers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 No customers yet.
               </TableCell>
             </TableRow>
           ) : (
-            customers.map((customer) => (
-              <TableRow key={customer.customer_id}>
-                <TableCell>{customer.company_name}</TableCell>
-                <TableCell>{customer.address ?? '-'}</TableCell>
-                <TableCell>{customer.contact_name ?? '-'}</TableCell>
-                <TableCell>{customer.phone_number ?? '-'}</TableCell>
-              </TableRow>
-            ))
+            customers
+              .slice()
+              .sort((a, b) => a.customer_id - b.customer_id)
+              .map((customer) => (
+                <TableRow key={customer.customer_id}>
+                  <TableCell>{customer.customer_id}</TableCell>
+                  <TableCell>{customer.company_name}</TableCell>
+                  <TableCell>{customer.address ?? '-'}</TableCell>
+                  <TableCell>{customer.contact_name ?? '-'}</TableCell>
+                  <TableCell>{customer.phone_number ?? '-'}</TableCell>
+                </TableRow>
+              ))
           )}
         </TableBody>
       </Table>
