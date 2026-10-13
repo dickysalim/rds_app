@@ -88,8 +88,8 @@ function groupByMonth(nota: NotaListItem[]): MonthGroup[] {
 export function HomePage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
-  const [openCompanies, setOpenCompanies] = useState<Set<string>>(new Set())
+  const [openMonth, setOpenMonth] = useState<string | null>(null)
+  const [openCompany, setOpenCompany] = useState<string | null>(null)
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
@@ -100,7 +100,7 @@ export function HomePage() {
       .then((rows) => {
         setNota(rows)
         const months = groupByMonth(rows)
-        if (months[0]) setOpenMonths(new Set([months[0].key]))
+        if (months[0]) setOpenMonth(months[0].key)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -108,21 +108,14 @@ export function HomePage() {
   const months = useMemo(() => groupByMonth(nota), [nota])
 
   function toggleMonth(key: string) {
-    setOpenMonths((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    setOpenMonth((prev) => (prev === key ? null : key))
+    setOpenCompany(null)
+    setExpandedNotaId(null)
   }
 
   function toggleCompany(key: string) {
-    setOpenCompanies((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    setOpenCompany((prev) => (prev === key ? null : key))
+    setExpandedNotaId(null)
   }
 
   function toggleExpandNota(notaId: number) {
@@ -170,7 +163,7 @@ export function HomePage() {
             </TableHeader>
             <TableBody>
               {months.map((month) => {
-                const monthOpen = openMonths.has(month.key)
+                const monthOpen = openMonth === month.key
                 return (
                   <Fragment key={month.key}>
                     <TableRow
@@ -198,14 +191,14 @@ export function HomePage() {
                     {monthOpen &&
                       month.companies.map((company) => {
                         const companyKey = `${month.key}|${company.company}`
-                        const companyOpen = openCompanies.has(companyKey)
+                        const companyOpen = openCompany === companyKey
                         return (
                           <Fragment key={companyKey}>
                             <TableRow
                               className="cursor-pointer bg-muted/30 hover:bg-muted/50"
                               onClick={() => toggleCompany(companyKey)}
                             >
-                              <TableCell className="pl-8">
+                              <TableCell className="pl-12">
                                 <div className="flex items-center gap-2">
                                   {companyOpen ? (
                                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
