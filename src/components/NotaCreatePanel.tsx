@@ -87,6 +87,10 @@ export function NotaCreatePanel({
     listProducts().then(setProducts).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    setError(null)
+  }, [notaDate, companyName, companyAddress, contactPerson, phoneNumber, items])
+
   function updateItem(key: string, patch: Partial<ItemRow>) {
     setItems((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)))
   }
