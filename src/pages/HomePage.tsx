@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Table,
   TableBody,
@@ -83,6 +83,31 @@ function groupByMonth(nota: NotaListItem[]): MonthGroup[] {
   })
 
   return result.sort((a, b) => (a.key < b.key ? 1 : -1))
+}
+
+function DrawerRow({
+  open,
+  colSpan,
+  className,
+  children,
+}: {
+  open: boolean
+  colSpan: number
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <TableRow className="border-0 hover:bg-transparent">
+      <TableCell colSpan={colSpan} className={`p-0 ${className ?? ''}`}>
+        <div
+          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+        >
+          <div className="overflow-hidden">{children}</div>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
 }
 
 export function HomePage() {
@@ -172,11 +197,9 @@ export function HomePage() {
                     >
                       <TableCell className="pl-2">
                         <div className="flex items-center gap-2">
-                          {monthOpen ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          )}
+                          <ChevronRight
+                            className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${monthOpen ? 'rotate-90' : ''}`}
+                          />
                           {month.label}
                         </div>
                       </TableCell>
@@ -188,41 +211,39 @@ export function HomePage() {
                       <TableCell className="text-right">{formatRupiah(month.totalPaid)}</TableCell>
                     </TableRow>
 
-                    {monthOpen &&
-                      month.companies.map((company) => {
-                        const companyKey = `${month.key}|${company.company}`
-                        const companyOpen = openCompany === companyKey
-                        return (
-                          <Fragment key={companyKey}>
-                            <TableRow
-                              className="cursor-pointer bg-muted/30 hover:bg-muted/50"
-                              onClick={() => toggleCompany(companyKey)}
-                            >
-                              <TableCell className="pl-12">
-                                <div className="flex items-center gap-2">
-                                  {companyOpen ? (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  {company.company}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">{company.notaCount}</TableCell>
-                              <TableCell className="text-right">
-                                {formatRupiah(company.totalBill)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatRupiah(company.totalUnpaid)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatRupiah(company.totalPaid)}
-                              </TableCell>
-                            </TableRow>
+                    <DrawerRow open={monthOpen} colSpan={5}>
+                      <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                        <TableBody>
+                          {month.companies.map((company) => {
+                            const companyKey = `${month.key}|${company.company}`
+                            const companyOpen = openCompany === companyKey
+                            return (
+                              <Fragment key={companyKey}>
+                                <TableRow
+                                  className="cursor-pointer bg-muted/30 hover:bg-muted/50"
+                                  onClick={() => toggleCompany(companyKey)}
+                                >
+                                  <TableCell className="w-auto pl-12">
+                                    <div className="flex items-center gap-2">
+                                      <ChevronRight
+                                        className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${companyOpen ? 'rotate-90' : ''}`}
+                                      />
+                                      {company.company}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">{company.notaCount}</TableCell>
+                                  <TableCell className="text-right">
+                                    {formatRupiah(company.totalBill)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatRupiah(company.totalUnpaid)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatRupiah(company.totalPaid)}
+                                  </TableCell>
+                                </TableRow>
 
-                            {companyOpen && (
-                              <TableRow key={`${companyKey}-detail`}>
-                                <TableCell colSpan={5} className="bg-background p-0 pl-14">
+                                <DrawerRow open={companyOpen} colSpan={5} className="bg-background">
                                   <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                                     <TableHeader>
                                       <TableRow>
@@ -256,11 +277,9 @@ export function HomePage() {
                                                     toggleExpandNota(n.nota_id)
                                                   }}
                                                 >
-                                                  {isExpanded ? (
-                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                                  ) : (
-                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                                  )}
+                                                  <ChevronRight
+                                                    className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
+                                                  />
                                                 </button>
                                               </TableCell>
                                               <TableCell>{n.nota_number}</TableCell>
@@ -289,90 +308,91 @@ export function HomePage() {
                                               </TableCell>
                                             </TableRow>
 
-                                            {isExpanded && (
-                                              <TableRow>
-                                                <TableCell colSpan={8} className="bg-muted/30 pl-20">
-                                                  {!payments ? (
-                                                    <p className="py-2 text-muted-foreground">
-                                                      Loading payments…
-                                                    </p>
-                                                  ) : payments.length === 0 ? (
-                                                    <p className="py-2 text-muted-foreground">
-                                                      No payments yet.
-                                                    </p>
-                                                  ) : (
-                                                    <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
-                                                      <TableHeader>
-                                                        <TableRow>
-                                                          <TableHead className="font-bold">
-                                                            Payment Number
-                                                          </TableHead>
-                                                          <TableHead className="font-bold">
-                                                            Payment Date
-                                                          </TableHead>
-                                                          <TableHead className="text-right font-bold">
-                                                            Amount
-                                                          </TableHead>
-                                                          <TableHead className="font-bold">
-                                                            Method
-                                                          </TableHead>
-                                                          <TableHead className="font-bold">
-                                                            Reference
-                                                          </TableHead>
-                                                          <TableHead className="font-bold">
-                                                            Evidence
-                                                          </TableHead>
-                                                        </TableRow>
-                                                      </TableHeader>
-                                                      <TableBody>
-                                                        {payments.map((p) => (
-                                                          <TableRow key={p.payment_id}>
-                                                            <TableCell>
-                                                              {p.payment_number ?? '-'}
-                                                            </TableCell>
-                                                            <TableCell>{p.payment_date}</TableCell>
-                                                            <TableCell className="text-right">
-                                                              {formatRupiah(p.amount)}
-                                                            </TableCell>
-                                                            <TableCell>{p.method ?? '-'}</TableCell>
-                                                            <TableCell>{p.reference ?? '-'}</TableCell>
-                                                            <TableCell>
-                                                              {p.evidence_key ? (
-                                                                <a
-                                                                  href={getPaymentEvidenceUrl(
-                                                                    n.nota_id,
-                                                                    p.payment_id,
-                                                                  )}
-                                                                  target="_blank"
-                                                                  rel="noreferrer"
-                                                                  className="text-primary underline"
-                                                                  onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                  View
-                                                                </a>
-                                                              ) : (
-                                                                '-'
+                                            <DrawerRow
+                                              open={isExpanded}
+                                              colSpan={8}
+                                              className="bg-muted/30 pl-20"
+                                            >
+                                              {!payments ? (
+                                                <p className="py-2 text-muted-foreground">
+                                                  Loading payments…
+                                                </p>
+                                              ) : payments.length === 0 ? (
+                                                <p className="py-2 text-muted-foreground">
+                                                  No payments yet.
+                                                </p>
+                                              ) : (
+                                                <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                                                  <TableHeader>
+                                                    <TableRow>
+                                                      <TableHead className="font-bold">
+                                                        Payment Number
+                                                      </TableHead>
+                                                      <TableHead className="font-bold">
+                                                        Payment Date
+                                                      </TableHead>
+                                                      <TableHead className="text-right font-bold">
+                                                        Amount
+                                                      </TableHead>
+                                                      <TableHead className="font-bold">
+                                                        Method
+                                                      </TableHead>
+                                                      <TableHead className="font-bold">
+                                                        Reference
+                                                      </TableHead>
+                                                      <TableHead className="font-bold">
+                                                        Evidence
+                                                      </TableHead>
+                                                    </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                    {payments.map((p) => (
+                                                      <TableRow key={p.payment_id}>
+                                                        <TableCell>
+                                                          {p.payment_number ?? '-'}
+                                                        </TableCell>
+                                                        <TableCell>{p.payment_date}</TableCell>
+                                                        <TableCell className="text-right">
+                                                          {formatRupiah(p.amount)}
+                                                        </TableCell>
+                                                        <TableCell>{p.method ?? '-'}</TableCell>
+                                                        <TableCell>{p.reference ?? '-'}</TableCell>
+                                                        <TableCell>
+                                                          {p.evidence_key ? (
+                                                            <a
+                                                              href={getPaymentEvidenceUrl(
+                                                                n.nota_id,
+                                                                p.payment_id,
                                                               )}
-                                                            </TableCell>
-                                                          </TableRow>
-                                                        ))}
-                                                      </TableBody>
-                                                    </Table>
-                                                  )}
-                                                </TableCell>
-                                              </TableRow>
-                                            )}
+                                                              target="_blank"
+                                                              rel="noreferrer"
+                                                              className="text-primary underline"
+                                                              onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                              View
+                                                            </a>
+                                                          ) : (
+                                                            '-'
+                                                          )}
+                                                        </TableCell>
+                                                      </TableRow>
+                                                    ))}
+                                                  </TableBody>
+                                                </Table>
+                                              )}
+                                            </DrawerRow>
                                           </Fragment>
                                         )
                                       })}
                                     </TableBody>
                                   </Table>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </Fragment>
-                        )
-                      })}
+                                </DrawerRow>
+                              </Fragment>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </DrawerRow>
                   </Fragment>
                 )
               })}
