@@ -72,8 +72,10 @@ export function NotaCreatePanel({
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [notaDate, setNotaDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [customerQuery, setCustomerQuery] = useState('')
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [companyName, setCompanyName] = useState('')
+  const [companyAddress, setCompanyAddress] = useState('')
+  const [contactPerson, setContactPerson] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
   const [items, setItems] = useState<ItemRow[]>([newRow()])
   const [error, setError] = useState<string | null>(null)
@@ -99,8 +101,16 @@ export function NotaCreatePanel({
     })
   }
 
-  const filteredCustomers = customerQuery
-    ? customers.filter((c) => c.company_name.toLowerCase().includes(customerQuery.toLowerCase()))
+  function handlePickCompany(customer: Customer) {
+    setCompanyName(customer.company_name)
+    setCompanyAddress(customer.address ?? '')
+    setContactPerson(customer.contact_name ?? '')
+    setPhoneNumber(customer.phone_number ?? '')
+    setShowCustomerSuggestions(false)
+  }
+
+  const filteredCustomers = companyName
+    ? customers.filter((c) => c.company_name.toLowerCase().includes(companyName.toLowerCase()))
     : customers
 
   const grandTotal = items.reduce((sum, row) => {
@@ -111,12 +121,8 @@ export function NotaCreatePanel({
     e.preventDefault()
     setError(null)
 
-    if (!selectedCustomer) {
-      setError('Pick a customer from the suggestions')
-      return
-    }
-    if (!selectedCustomer.contact_id) {
-      setError('This customer has no contact on file')
+    if (!companyName || !contactPerson || !phoneNumber) {
+      setError('Company name, contact person and phone number are required')
       return
     }
     if (items.length === 0 || items.some((row) => !row.skuQuery || !row.unit || !row.qty)) {
@@ -126,8 +132,10 @@ export function NotaCreatePanel({
 
     const input: NotaInput = {
       nota_date: notaDate,
-      customer_id: selectedCustomer.customer_id,
-      contact_id: selectedCustomer.contact_id,
+      company_name: companyName,
+      company_address: companyAddress || null,
+      contact_name: contactPerson,
+      phone_number: phoneNumber,
       items: items.map((row) => ({
         sku_id: row.skuId,
         sku_name: row.skuQuery,
@@ -163,30 +171,32 @@ export function NotaCreatePanel({
       </div>
 
       <form id="nota-form" className="space-y-4" onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:max-w-2xl">
-          <div className="space-y-2">
-            <Label htmlFor="nota_date">Date</Label>
+        <div className="grid max-w-xl grid-cols-[9rem_1fr] items-center gap-x-4 gap-y-3">
+          <Label htmlFor="nota_date" className="text-right">
+            Date
+          </Label>
+          <Input
+            id="nota_date"
+            type="date"
+            value={notaDate}
+            onChange={(e) => setNotaDate(e.target.value)}
+            required
+          />
+
+          <Label htmlFor="company_name" className="text-right">
+            Company Name
+          </Label>
+          <div className="relative">
             <Input
-              id="nota_date"
-              type="date"
-              value={notaDate}
-              onChange={(e) => setNotaDate(e.target.value)}
-              required
-            />
-          </div>
-          <div className="relative space-y-2">
-            <Label htmlFor="customer">Customer</Label>
-            <Input
-              id="customer"
-              value={customerQuery}
+              id="company_name"
+              value={companyName}
               onChange={(e) => {
-                setCustomerQuery(e.target.value)
-                setSelectedCustomer(null)
+                setCompanyName(e.target.value)
                 setShowCustomerSuggestions(true)
               }}
               onFocus={() => setShowCustomerSuggestions(true)}
               onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 100)}
-              placeholder="Type company name"
+              placeholder="Type or pick a company name"
               autoComplete="off"
               required
             />
@@ -197,24 +207,43 @@ export function NotaCreatePanel({
                     key={c.customer_id}
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={() => {
-                      setSelectedCustomer(c)
-                      setCustomerQuery(c.company_name)
-                      setShowCustomerSuggestions(false)
-                    }}
+                    onClick={() => handlePickCompany(c)}
                   >
                     {c.company_name}
                   </button>
                 ))}
               </div>
             )}
-            {selectedCustomer && (
-              <p className="text-xs text-muted-foreground">
-                {selectedCustomer.contact_name ?? 'No contact'}
-                {selectedCustomer.phone_number ? ` · ${selectedCustomer.phone_number}` : ''}
-              </p>
-            )}
           </div>
+
+          <Label htmlFor="company_address" className="text-right">
+            Company Address
+          </Label>
+          <Input
+            id="company_address"
+            value={companyAddress}
+            onChange={(e) => setCompanyAddress(e.target.value)}
+          />
+
+          <Label htmlFor="contact_person" className="text-right">
+            Contact Person
+          </Label>
+          <Input
+            id="contact_person"
+            value={contactPerson}
+            onChange={(e) => setContactPerson(e.target.value)}
+            required
+          />
+
+          <Label htmlFor="phone_number" className="text-right">
+            Phone Number
+          </Label>
+          <Input
+            id="phone_number"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            required
+          />
         </div>
 
         <div className="space-y-2">

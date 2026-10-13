@@ -30,8 +30,10 @@ export interface NotaItemInput {
 
 export interface NotaInput {
   nota_date: string
-  customer_id: number
-  contact_id: number
+  company_name: string
+  company_address: string | null
+  contact_name: string
+  phone_number: string
   items: NotaItemInput[]
 }
 
