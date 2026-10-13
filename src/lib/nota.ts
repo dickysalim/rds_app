@@ -92,6 +92,7 @@ export async function voidNota(notaId: number): Promise<void> {
 
 export interface Payment {
   payment_id: number
+  payment_number: string | null
   payment_date: string
   amount: number
   method: string | null

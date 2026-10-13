@@ -198,6 +198,7 @@ export function NotaPage() {
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                <TableHead>Payment Number</TableHead>
                                 <TableHead>Payment Date</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead>Method</TableHead>
@@ -208,6 +209,7 @@ export function NotaPage() {
                             <TableBody>
                               {payments.map((p) => (
                                 <TableRow key={p.payment_id}>
+                                  <TableCell>{p.payment_number ?? '-'}</TableCell>
                                   <TableCell>{p.payment_date}</TableCell>
                                   <TableCell className="text-right">
                                     {formatRupiah(p.amount)}
