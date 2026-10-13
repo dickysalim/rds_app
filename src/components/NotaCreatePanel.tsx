@@ -207,6 +207,7 @@ export function NotaCreatePanel({
                     key={c.customer_id}
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePickCompany(c)}
                   >
                     {c.company_name}
@@ -291,6 +292,7 @@ export function NotaCreatePanel({
                             key={p.sku_id}
                             type="button"
                             className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => handlePickProduct(row.key, p)}
                           >
                             {p.sku_name}
