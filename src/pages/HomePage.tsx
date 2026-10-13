@@ -8,6 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { formatRupiah } from '@/lib/currency'
 import { getPaymentEvidenceUrl, listNota, listPayments, type NotaListItem, type Payment } from '@/lib/nota'
@@ -91,6 +93,7 @@ export function HomePage() {
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
+  const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
 
   useEffect(() => {
     listNota()
@@ -132,6 +135,15 @@ export function HomePage() {
     }
   }
 
+  function handlePaymentCreated(notaId: number) {
+    listPayments(notaId)
+      .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
+      .catch(() => {})
+    listNota()
+      .then(setNota)
+      .catch(() => {})
+  }
+
   if (selectedNotaId !== null) {
     return <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
   }
@@ -149,11 +161,11 @@ export function HomePage() {
           <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
             <TableHeader>
               <TableRow>
-                <TableHead>Month</TableHead>
-                <TableHead className="text-right">Nota Count</TableHead>
-                <TableHead className="text-right">Total Bill</TableHead>
-                <TableHead className="text-right">Unpaid</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="font-bold">Month</TableHead>
+                <TableHead className="text-right font-bold">Nota Count</TableHead>
+                <TableHead className="text-right font-bold">Total Bill</TableHead>
+                <TableHead className="text-right font-bold">Unpaid</TableHead>
+                <TableHead className="text-right font-bold">Paid</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,10 +174,10 @@ export function HomePage() {
                 return (
                   <Fragment key={month.key}>
                     <TableRow
-                      className="cursor-pointer hover:bg-accent/50"
+                      className="cursor-pointer font-bold hover:bg-accent/50"
                       onClick={() => toggleMonth(month.key)}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="pl-2">
                         <div className="flex items-center gap-2">
                           {monthOpen ? (
                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -177,7 +189,7 @@ export function HomePage() {
                       </TableCell>
                       <TableCell className="text-right">{month.notaCount}</TableCell>
                       <TableCell className="text-right">{formatRupiah(month.totalBill)}</TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right">
                         {formatRupiah(month.totalUnpaid)}
                       </TableCell>
                       <TableCell className="text-right">{formatRupiah(month.totalPaid)}</TableCell>
@@ -222,25 +234,27 @@ export function HomePage() {
                                     <TableHeader>
                                       <TableRow>
                                         <TableHead className="w-8" />
-                                        <TableHead>Nota Number</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                        <TableHead className="text-right">Unpaid</TableHead>
-                                        <TableHead className="text-right">Paid</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead className="font-bold">Nota Number</TableHead>
+                                        <TableHead className="font-bold">Date</TableHead>
+                                        <TableHead className="text-right font-bold">Total</TableHead>
+                                        <TableHead className="text-right font-bold">Unpaid</TableHead>
+                                        <TableHead className="text-right font-bold">Paid</TableHead>
+                                        <TableHead className="font-bold">Status</TableHead>
+                                        <TableHead className="font-bold">Action</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                       {company.nota.map((n) => {
                                         const isExpanded = expandedNotaId === n.nota_id
                                         const payments = paymentsByNota[n.nota_id]
+                                        const canPay = n.status === 'unpaid' || n.status === 'partial'
                                         return (
                                           <Fragment key={n.nota_id}>
                                             <TableRow
                                               className="cursor-pointer hover:bg-accent/50"
                                               onClick={() => setSelectedNotaId(n.nota_id)}
                                             >
-                                              <TableCell>
+                                              <TableCell className="pl-6">
                                                 <button
                                                   type="button"
                                                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
@@ -268,11 +282,23 @@ export function HomePage() {
                                                 {formatRupiah(n.paid_amount)}
                                               </TableCell>
                                               <TableCell className="capitalize">{n.status}</TableCell>
+                                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                                {canPay && (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-6 px-2 text-xs"
+                                                    onClick={() => setPaymentDialogNotaId(n.nota_id)}
+                                                  >
+                                                    Make Payment
+                                                  </Button>
+                                                )}
+                                              </TableCell>
                                             </TableRow>
 
                                             {isExpanded && (
                                               <TableRow>
-                                                <TableCell colSpan={7} className="bg-muted/30 pl-10">
+                                                <TableCell colSpan={8} className="bg-muted/30 pl-20">
                                                   {!payments ? (
                                                     <p className="py-2 text-muted-foreground">
                                                       Loading payments…
@@ -285,14 +311,24 @@ export function HomePage() {
                                                     <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
                                                       <TableHeader>
                                                         <TableRow>
-                                                          <TableHead>Payment Number</TableHead>
-                                                          <TableHead>Payment Date</TableHead>
-                                                          <TableHead className="text-right">
+                                                          <TableHead className="font-bold">
+                                                            Payment Number
+                                                          </TableHead>
+                                                          <TableHead className="font-bold">
+                                                            Payment Date
+                                                          </TableHead>
+                                                          <TableHead className="text-right font-bold">
                                                             Amount
                                                           </TableHead>
-                                                          <TableHead>Method</TableHead>
-                                                          <TableHead>Reference</TableHead>
-                                                          <TableHead>Evidence</TableHead>
+                                                          <TableHead className="font-bold">
+                                                            Method
+                                                          </TableHead>
+                                                          <TableHead className="font-bold">
+                                                            Reference
+                                                          </TableHead>
+                                                          <TableHead className="font-bold">
+                                                            Evidence
+                                                          </TableHead>
                                                         </TableRow>
                                                       </TableHeader>
                                                       <TableBody>
@@ -350,6 +386,15 @@ export function HomePage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {paymentDialogNotaId !== null && (
+        <MakePaymentDialog
+          notaId={paymentDialogNotaId}
+          open
+          onClose={() => setPaymentDialogNotaId(null)}
+          onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
+        />
       )}
     </div>
   )
