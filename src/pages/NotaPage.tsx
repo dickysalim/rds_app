@@ -28,8 +28,16 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
+import { UploadEvidenceDialog } from '@/components/UploadEvidenceDialog'
 import { formatRupiah } from '@/lib/currency'
-import { listNota, listPayments, voidNota, type NotaListItem, type Payment } from '@/lib/nota'
+import {
+  getPaymentEvidenceUrl,
+  listNota,
+  listPayments,
+  voidNota,
+  type NotaListItem,
+  type Payment,
+} from '@/lib/nota'
 
 export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
@@ -39,6 +47,9 @@ export function NotaPage() {
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
+  const [evidenceTarget, setEvidenceTarget] = useState<{ notaId: number; payment: Payment } | null>(
+    null,
+  )
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -195,6 +206,7 @@ export function NotaPage() {
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead>Method</TableHead>
                                 <TableHead>Reference</TableHead>
+                                <TableHead>Evidence</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -206,6 +218,21 @@ export function NotaPage() {
                                   </TableCell>
                                   <TableCell>{p.method ?? '-'}</TableCell>
                                   <TableCell>{p.reference ?? '-'}</TableCell>
+                                  <TableCell>
+                                    {p.evidence_key ? (
+                                      <a
+                                        href={getPaymentEvidenceUrl(n.nota_id, p.payment_id)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary underline"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View
+                                      </a>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -226,7 +253,20 @@ export function NotaPage() {
           notaId={paymentDialogNotaId}
           open
           onClose={() => setPaymentDialogNotaId(null)}
-          onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
+          onCreated={(payment) => {
+            handlePaymentCreated(paymentDialogNotaId)
+            setEvidenceTarget({ notaId: paymentDialogNotaId, payment })
+          }}
+        />
+      )}
+
+      {evidenceTarget && (
+        <UploadEvidenceDialog
+          notaId={evidenceTarget.notaId}
+          paymentId={evidenceTarget.payment.payment_id}
+          open
+          onClose={() => setEvidenceTarget(null)}
+          onUploaded={() => handlePaymentCreated(evidenceTarget.notaId)}
         />
       )}
 

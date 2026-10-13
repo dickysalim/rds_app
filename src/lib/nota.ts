@@ -1,4 +1,6 @@
-import { apiFetch } from '@/lib/api'
+import { API_URL, apiFetch } from '@/lib/api'
+
+export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Check', 'Other'] as const
 
 export interface NotaListItem {
   nota_id: number
@@ -94,6 +96,7 @@ export interface Payment {
   amount: number
   method: string | null
   reference: string | null
+  evidence_key: string | null
 }
 
 export async function listPayments(notaId: number): Promise<Payment[]> {
@@ -106,7 +109,7 @@ export async function listPayments(notaId: number): Promise<Payment[]> {
 export interface PaymentInput {
   payment_date: string
   amount: number
-  method?: string | null
+  method: string
   reference?: string | null
 }
 
@@ -119,4 +122,24 @@ export async function createPayment(notaId: number, input: PaymentInput): Promis
   const data = (await res.json()) as { payment?: Payment; error?: string }
   if (!res.ok || !data.payment) throw new Error(data.error ?? 'Failed to record payment')
   return data.payment
+}
+
+export function getPaymentEvidenceUrl(notaId: number, paymentId: number): string {
+  return `${API_URL}/nota/${notaId}/payments/${paymentId}/evidence?t=${Date.now()}`
+}
+
+export async function uploadPaymentEvidence(
+  notaId: number,
+  paymentId: number,
+  blob: Blob,
+): Promise<void> {
+  const res = await apiFetch(`/nota/${notaId}/payments/${paymentId}/evidence`, {
+    method: 'PUT',
+    headers: { 'Content-Type': blob.type },
+    body: blob,
+  })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error ?? 'Failed to upload evidence')
+  }
 }

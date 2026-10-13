@@ -9,7 +9,14 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createPayment, type Payment } from '@/lib/nota'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { createPayment, PAYMENT_METHODS, type Payment } from '@/lib/nota'
 
 export function MakePaymentDialog({
   notaId,
@@ -45,18 +52,22 @@ export function MakePaymentDialog({
       setError('Amount must be greater than 0')
       return
     }
+    if (!method) {
+      setError('Payment method is required')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       const payment = await createPayment(notaId, {
         payment_date: paymentDate,
         amount: amountNum,
-        method: method || null,
+        method,
         reference: reference || null,
       })
-      onCreated(payment)
       reset()
       onClose()
+      onCreated(payment)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record payment')
     } finally {
@@ -102,13 +113,19 @@ export function MakePaymentDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="payment_method">Method (optional)</Label>
-              <Input
-                id="payment_method"
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                placeholder="Cash, Transfer, ..."
-              />
+              <Label htmlFor="payment_method">Method</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger id="payment_method" className="w-full">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="payment_reference">Reference (optional)</Label>
