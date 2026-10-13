@@ -104,7 +104,7 @@ export function NotaPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
       </div>
-      <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
+      <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
             <TableHead className="w-8" />
@@ -201,7 +201,7 @@ export function NotaPage() {
                         ) : payments.length === 0 ? (
                           <p className="py-2 text-sm text-muted-foreground">No payments yet.</p>
                         ) : (
-                          <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
+                          <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Payment Number</TableHead>

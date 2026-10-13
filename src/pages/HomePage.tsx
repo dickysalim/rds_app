@@ -151,7 +151,7 @@ export function HomePage() {
         <p className="text-sm text-muted-foreground">No nota yet.</p>
       ) : (
         <div className="overflow-hidden rounded-md border">
-          <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
+          <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
             <TableHeader>
               <TableRow>
                 <TableHead className="font-bold">Month</TableHead>
@@ -223,7 +223,7 @@ export function HomePage() {
                             {companyOpen && (
                               <TableRow key={`${companyKey}-detail`}>
                                 <TableCell colSpan={5} className="bg-background p-0 pl-14">
-                                  <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
+                                  <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                                     <TableHeader>
                                       <TableRow>
                                         <TableHead className="w-8" />
@@ -301,7 +301,7 @@ export function HomePage() {
                                                       No payments yet.
                                                     </p>
                                                   ) : (
-                                                    <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
+                                                    <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                                                       <TableHeader>
                                                         <TableRow>
                                                           <TableHead className="font-bold">
