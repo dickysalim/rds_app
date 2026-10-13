@@ -98,7 +98,11 @@ function DrawerRow({
 }) {
   return (
     <TableRow className="border-0 hover:bg-transparent">
-      <TableCell colSpan={colSpan} className={`p-0 ${className ?? ''}`}>
+      <TableCell
+        colSpan={colSpan}
+        className={`p-0 leading-none ${className ?? ''}`}
+        style={{ lineHeight: 0, padding: 0 }}
+      >
         <div
           className="grid min-h-0 transition-[grid-template-rows] duration-300 ease-in-out"
           style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
