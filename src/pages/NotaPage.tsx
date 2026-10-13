@@ -28,7 +28,6 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
-import { UploadEvidenceDialog } from '@/components/UploadEvidenceDialog'
 import { formatRupiah } from '@/lib/currency'
 import {
   getPaymentEvidenceUrl,
@@ -47,9 +46,6 @@ export function NotaPage() {
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
-  const [evidenceTarget, setEvidenceTarget] = useState<{ notaId: number; payment: Payment } | null>(
-    null,
-  )
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -253,20 +249,7 @@ export function NotaPage() {
           notaId={paymentDialogNotaId}
           open
           onClose={() => setPaymentDialogNotaId(null)}
-          onCreated={(payment) => {
-            handlePaymentCreated(paymentDialogNotaId)
-            setEvidenceTarget({ notaId: paymentDialogNotaId, payment })
-          }}
-        />
-      )}
-
-      {evidenceTarget && (
-        <UploadEvidenceDialog
-          notaId={evidenceTarget.notaId}
-          paymentId={evidenceTarget.payment.payment_id}
-          open
-          onClose={() => setEvidenceTarget(null)}
-          onUploaded={() => handlePaymentCreated(evidenceTarget.notaId)}
+          onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
         />
       )}
 

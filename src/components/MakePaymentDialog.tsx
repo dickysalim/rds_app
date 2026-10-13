@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createPayment, PAYMENT_METHODS, type Payment } from '@/lib/nota'
+import { formatRupiahInput } from '@/lib/currency'
+import { createPayment, PAYMENT_METHODS, uploadPaymentEvidence, type Payment } from '@/lib/nota'
 
 export function MakePaymentDialog({
   notaId,
@@ -30,24 +31,26 @@ export function MakePaymentDialog({
   onCreated: (payment: Payment) => void
 }) {
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [amount, setAmount] = useState('')
+  const [amountDisplay, setAmountDisplay] = useState('')
   const [method, setMethod] = useState('')
   const [reference, setReference] = useState('')
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   function reset() {
     setPaymentDate(new Date().toISOString().slice(0, 10))
-    setAmount('')
+    setAmountDisplay('')
     setMethod('')
     setReference('')
+    setEvidenceFile(null)
     setError(null)
     setSaving(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const amountNum = Number(amount)
+    const amountNum = Number(amountDisplay.replace(/\D/g, ''))
     if (!amountNum || amountNum <= 0) {
       setError('Amount must be greater than 0')
       return
@@ -65,6 +68,9 @@ export function MakePaymentDialog({
         method,
         reference: reference || null,
       })
+      if (evidenceFile) {
+        await uploadPaymentEvidence(notaId, payment.payment_id, evidenceFile).catch(() => {})
+      }
       reset()
       onClose()
       onCreated(payment)
@@ -103,14 +109,19 @@ export function MakePaymentDialog({
             </div>
             <div className="space-y-1">
               <Label htmlFor="payment_amount">Amount</Label>
-              <Input
-                id="payment_amount"
-                type="number"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  Rp
+                </span>
+                <Input
+                  id="payment_amount"
+                  inputMode="numeric"
+                  className="pl-8"
+                  value={amountDisplay}
+                  onChange={(e) => setAmountDisplay(formatRupiahInput(e.target.value))}
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor="payment_method">Method</Label>
@@ -133,6 +144,15 @@ export function MakePaymentDialog({
                 id="payment_reference"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="payment_evidence">Upload Evidence (optional)</Label>
+              <Input
+                id="payment_evidence"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                onChange={(e) => setEvidenceFile(e.target.files?.[0] ?? null)}
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
