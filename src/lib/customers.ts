@@ -4,6 +4,7 @@ export interface Customer {
   customer_id: number
   company_name: string
   address: string | null
+  contact_id: number | null
   contact_name: string | null
   phone_number: string | null
 }

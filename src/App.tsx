@@ -6,6 +6,7 @@ import { HomePage } from '@/pages/HomePage'
 import { NotaPage } from '@/pages/NotaPage'
 import { CustomerPage } from '@/pages/CustomerPage'
 import { ProductPage } from '@/pages/ProductPage'
+import { BusinessSettingsPage } from '@/pages/BusinessSettingsPage'
 import { fetchCurrentUser, logout, type AuthUser } from '@/lib/auth'
 import { getToken } from '@/lib/api'
 
@@ -47,6 +48,7 @@ function App() {
           <Route path="/nota" element={<NotaPage />} />
           <Route path="/customer" element={<CustomerPage />} />
           <Route path="/product" element={<ProductPage />} />
+          <Route path="/business-settings" element={<BusinessSettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

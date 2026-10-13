@@ -1,4 +1,4 @@
-import { Home, Receipt, Users, Package } from 'lucide-react'
+import { Home, Receipt, Users, Package, Settings } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Sidebar,
@@ -17,6 +17,7 @@ const items = [
   { title: 'Nota', url: '/nota', icon: Receipt },
   { title: 'Customer', url: '/customer', icon: Users },
   { title: 'Product', url: '/product', icon: Package },
+  { title: 'Business Settings', url: '/business-settings', icon: Settings },
 ]
 
 export function AppSidebar() {
