@@ -184,11 +184,13 @@ export function HomePage() {
                 <TableHead className="text-right font-bold">Total Bill</TableHead>
                 <TableHead className="text-right font-bold">Unpaid</TableHead>
                 <TableHead className="text-right font-bold">Paid</TableHead>
+                <TableHead className="font-bold">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {months.map((month) => {
                 const monthOpen = openMonth === month.key
+                const monthSettled = month.totalPaid === month.totalBill
                 return (
                   <Fragment key={month.key}>
                     <TableRow
@@ -209,9 +211,20 @@ export function HomePage() {
                         {formatRupiah(month.totalUnpaid)}
                       </TableCell>
                       <TableCell className="text-right">{formatRupiah(month.totalPaid)}</TableCell>
+                      <TableCell>
+                        <span
+                          className={
+                            monthSettled
+                              ? 'rounded bg-green-100 px-2 py-0.5 text-green-700'
+                              : 'rounded bg-amber-100 px-2 py-0.5 text-amber-700'
+                          }
+                        >
+                          {monthSettled ? 'Settled' : 'Unsettled'}
+                        </span>
+                      </TableCell>
                     </TableRow>
 
-                    <DrawerRow open={monthOpen} colSpan={5}>
+                    <DrawerRow open={monthOpen} colSpan={6}>
                       <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                         <TableBody>
                           {month.companies.map((company) => {
