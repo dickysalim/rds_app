@@ -100,10 +100,10 @@ function DrawerRow({
     <TableRow className="border-0 hover:bg-transparent">
       <TableCell colSpan={colSpan} className={`p-0 ${className ?? ''}`}>
         <div
-          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          className="grid min-h-0 transition-[grid-template-rows] duration-300 ease-in-out"
           style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
         >
-          <div className="overflow-hidden">{children}</div>
+          <div className="min-h-0 overflow-hidden">{children}</div>
         </div>
       </TableCell>
     </TableRow>
@@ -281,7 +281,7 @@ export function HomePage() {
                                               className="h-9 cursor-pointer hover:bg-accent/50"
                                               onClick={() => setSelectedNotaId(n.nota_id)}
                                             >
-                                              <TableCell className="pl-10">
+                                              <TableCell className="pl-16">
                                                 <button
                                                   type="button"
                                                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
