@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
+import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { formatRupiah } from '@/lib/currency'
 import { listNota, type NotaListItem } from '@/lib/nota'
 
@@ -16,6 +17,7 @@ export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'list' | 'create'>('list')
+  const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
 
   useEffect(() => {
     listNota()
@@ -30,6 +32,10 @@ export function NotaPage() {
 
   if (view === 'create') {
     return <NotaCreatePanel onCancel={() => setView('list')} onSaved={handleSaved} />
+  }
+
+  if (selectedNotaId !== null) {
+    return <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
   }
 
   return (
@@ -64,7 +70,11 @@ export function NotaPage() {
             </TableRow>
           ) : (
             nota.map((n) => (
-              <TableRow key={n.nota_id}>
+              <TableRow
+                key={n.nota_id}
+                className="cursor-pointer hover:bg-accent/50"
+                onClick={() => setSelectedNotaId(n.nota_id)}
+              >
                 <TableCell>{n.nota_number}</TableCell>
                 <TableCell>{n.nota_date}</TableCell>
                 <TableCell>{n.customer_company_name_snapshot}</TableCell>

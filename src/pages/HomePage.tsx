@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { formatRupiah } from '@/lib/currency'
 import { listNota, type NotaListItem } from '@/lib/nota'
 
@@ -71,6 +72,7 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
   const [openCompanies, setOpenCompanies] = useState<Set<string>>(new Set())
+  const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
 
   useEffect(() => {
     listNota()
@@ -100,6 +102,10 @@ export function HomePage() {
       else next.add(key)
       return next
     })
+  }
+
+  if (selectedNotaId !== null) {
+    return <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
   }
 
   return (
@@ -183,7 +189,11 @@ export function HomePage() {
                                     </TableHeader>
                                     <TableBody>
                                       {company.nota.map((n) => (
-                                        <TableRow key={n.nota_id}>
+                                        <TableRow
+                                          key={n.nota_id}
+                                          className="cursor-pointer hover:bg-accent/50"
+                                          onClick={() => setSelectedNotaId(n.nota_id)}
+                                        >
                                           <TableCell>{n.nota_number}</TableCell>
                                           <TableCell>{n.nota_date}</TableCell>
                                           <TableCell className="text-right">

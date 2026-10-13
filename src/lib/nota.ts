@@ -47,3 +47,35 @@ export async function createNota(input: NotaInput): Promise<NotaListItem> {
   if (!res.ok || !data.nota) throw new Error(data.error ?? 'Failed to create nota')
   return data.nota
 }
+
+export interface NotaDetailItem {
+  nota_item_id: number
+  item_name_snapshot: string
+  unit_snapshot: string
+  qty: number
+  price: number
+  discount_amount: number
+  discount_percent: number
+  total_price: number
+}
+
+export interface NotaDetail {
+  nota_id: number
+  nota_number: string
+  nota_date: string
+  customer_company_name_snapshot: string
+  customer_address_snapshot: string | null
+  contact_name_snapshot: string
+  contact_phone_number_snapshot: string
+  total_price: number
+  paid_amount: number
+  status: string
+  items: NotaDetailItem[]
+}
+
+export async function getNota(notaId: number): Promise<NotaDetail> {
+  const res = await apiFetch(`/nota/${notaId}`)
+  const data = (await res.json()) as { nota?: NotaDetail; error?: string }
+  if (!res.ok || !data.nota) throw new Error(data.error ?? 'Failed to load nota')
+  return data.nota
+}
