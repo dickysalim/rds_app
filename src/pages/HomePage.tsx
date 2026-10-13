@@ -194,7 +194,7 @@ export function HomePage() {
                 return (
                   <Fragment key={month.key}>
                     <TableRow
-                      className="cursor-pointer font-bold hover:bg-accent/50"
+                      className="h-9 cursor-pointer font-bold hover:bg-accent/50"
                       onClick={() => toggleMonth(month.key)}
                     >
                       <TableCell className="pl-2">
@@ -233,7 +233,7 @@ export function HomePage() {
                             return (
                               <Fragment key={companyKey}>
                                 <TableRow
-                                  className="cursor-pointer bg-muted/30 hover:bg-muted/50"
+                                  className="h-9 cursor-pointer bg-muted/30 hover:bg-muted/50"
                                   onClick={() => toggleCompany(companyKey)}
                                 >
                                   <TableCell className="w-auto pl-12">
@@ -278,10 +278,10 @@ export function HomePage() {
                                         return (
                                           <Fragment key={n.nota_id}>
                                             <TableRow
-                                              className="cursor-pointer hover:bg-accent/50"
+                                              className="h-9 cursor-pointer hover:bg-accent/50"
                                               onClick={() => setSelectedNotaId(n.nota_id)}
                                             >
-                                              <TableCell className="pl-6">
+                                              <TableCell className="pl-10">
                                                 <button
                                                   type="button"
                                                   className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
