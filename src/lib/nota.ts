@@ -79,3 +79,44 @@ export async function getNota(notaId: number): Promise<NotaDetail> {
   if (!res.ok || !data.nota) throw new Error(data.error ?? 'Failed to load nota')
   return data.nota
 }
+
+export async function voidNota(notaId: number): Promise<void> {
+  const res = await apiFetch(`/nota/${notaId}/void`, { method: 'PUT' })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? 'Failed to delete nota')
+  }
+}
+
+export interface Payment {
+  payment_id: number
+  payment_date: string
+  amount: number
+  method: string | null
+  reference: string | null
+}
+
+export async function listPayments(notaId: number): Promise<Payment[]> {
+  const res = await apiFetch(`/nota/${notaId}/payments`)
+  if (!res.ok) throw new Error('Failed to load payments')
+  const data = (await res.json()) as { payments: Payment[] }
+  return data.payments
+}
+
+export interface PaymentInput {
+  payment_date: string
+  amount: number
+  method?: string | null
+  reference?: string | null
+}
+
+export async function createPayment(notaId: number, input: PaymentInput): Promise<Payment> {
+  const res = await apiFetch(`/nota/${notaId}/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const data = (await res.json()) as { payment?: Payment; error?: string }
+  if (!res.ok || !data.payment) throw new Error(data.error ?? 'Failed to record payment')
+  return data.payment
+}
