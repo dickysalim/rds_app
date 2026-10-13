@@ -328,42 +328,52 @@ export function HomePage() {
                                             <DrawerRow
                                               open={isExpanded}
                                               colSpan={8}
-                                              className="bg-muted/30 pl-20"
+                                              className="bg-muted/30 pl-28"
                                             >
-                                              {!payments ? (
-                                                <p className="py-2 text-muted-foreground">
-                                                  Loading payments…
-                                                </p>
-                                              ) : payments.length === 0 ? (
-                                                <p className="py-2 text-muted-foreground">
-                                                  No payments yet.
-                                                </p>
-                                              ) : (
-                                                <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
-                                                  <TableHeader>
+                                              <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                                                <TableHeader>
+                                                  <TableRow>
+                                                    <TableHead className="font-bold">
+                                                      Payment Number
+                                                    </TableHead>
+                                                    <TableHead className="font-bold">
+                                                      Payment Date
+                                                    </TableHead>
+                                                    <TableHead className="text-right font-bold">
+                                                      Amount
+                                                    </TableHead>
+                                                    <TableHead className="font-bold">
+                                                      Method
+                                                    </TableHead>
+                                                    <TableHead className="font-bold">
+                                                      Reference
+                                                    </TableHead>
+                                                    <TableHead className="font-bold">
+                                                      Evidence
+                                                    </TableHead>
+                                                  </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                  {!payments ? (
                                                     <TableRow>
-                                                      <TableHead className="font-bold">
-                                                        Payment Number
-                                                      </TableHead>
-                                                      <TableHead className="font-bold">
-                                                        Payment Date
-                                                      </TableHead>
-                                                      <TableHead className="text-right font-bold">
-                                                        Amount
-                                                      </TableHead>
-                                                      <TableHead className="font-bold">
-                                                        Method
-                                                      </TableHead>
-                                                      <TableHead className="font-bold">
-                                                        Reference
-                                                      </TableHead>
-                                                      <TableHead className="font-bold">
-                                                        Evidence
-                                                      </TableHead>
+                                                      <TableCell
+                                                        colSpan={6}
+                                                        className="text-center text-muted-foreground"
+                                                      >
+                                                        Loading payments…
+                                                      </TableCell>
                                                     </TableRow>
-                                                  </TableHeader>
-                                                  <TableBody>
-                                                    {payments.map((p) => (
+                                                  ) : payments.length === 0 ? (
+                                                    <TableRow>
+                                                      <TableCell
+                                                        colSpan={6}
+                                                        className="text-center text-muted-foreground"
+                                                      >
+                                                        No Payment Yet
+                                                      </TableCell>
+                                                    </TableRow>
+                                                  ) : (
+                                                    payments.map((p) => (
                                                       <TableRow key={p.payment_id}>
                                                         <TableCell>
                                                           {p.payment_number ?? '-'}
@@ -393,10 +403,10 @@ export function HomePage() {
                                                           )}
                                                         </TableCell>
                                                       </TableRow>
-                                                    ))}
-                                                  </TableBody>
-                                                </Table>
-                                              )}
+                                                    ))
+                                                  )}
+                                                </TableBody>
+                                              </Table>
                                             </DrawerRow>
                                           </Fragment>
                                         )
