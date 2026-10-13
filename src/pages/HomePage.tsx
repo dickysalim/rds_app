@@ -100,14 +100,14 @@ function DrawerRow({
     <TableRow className="border-0 hover:bg-transparent">
       <TableCell
         colSpan={colSpan}
-        className={`p-0 leading-none ${className ?? ''}`}
+        className="p-0 leading-none"
         style={{ lineHeight: 0, padding: 0 }}
       >
         <div
           className="grid min-h-0 transition-[grid-template-rows] duration-300 ease-in-out"
           style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
         >
-          <div className="min-h-0 overflow-hidden">{children}</div>
+          <div className={`min-h-0 overflow-hidden ${className ?? ''}`}>{children}</div>
         </div>
       </TableCell>
     </TableRow>
