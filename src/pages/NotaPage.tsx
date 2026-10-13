@@ -104,7 +104,7 @@ export function NotaPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
       </div>
-      <Table>
+      <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
             <TableHead className="w-8" />
@@ -112,7 +112,9 @@ export function NotaPage() {
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
-            <TableHead className="text-right">Total</TableHead>
+            <TableHead className="text-right">Total Bill</TableHead>
+            <TableHead className="text-right">Unpaid</TableHead>
+            <TableHead className="text-right">Paid</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="w-8" />
           </TableRow>
@@ -120,13 +122,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
+              <TableCell colSpan={10} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
+              <TableCell colSpan={10} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -161,6 +163,10 @@ export function NotaPage() {
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
                     <TableCell>{n.contact_name_snapshot}</TableCell>
                     <TableCell className="text-right">{formatRupiah(n.total_price)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatRupiah(n.total_price - n.paid_amount)}
+                    </TableCell>
+                    <TableCell className="text-right">{formatRupiah(n.paid_amount)}</TableCell>
                     <TableCell className="capitalize">{n.status}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
@@ -189,13 +195,13 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={8} className="bg-muted/30 pl-14">
+                      <TableCell colSpan={10} className="bg-muted/30 pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (
                           <p className="py-2 text-sm text-muted-foreground">No payments yet.</p>
                         ) : (
-                          <Table>
+                          <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Payment Number</TableHead>
