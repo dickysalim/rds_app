@@ -76,6 +76,7 @@ export function NotaCreatePanel({
   const [companyAddress, setCompanyAddress] = useState('')
   const [contactPerson, setContactPerson] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [isExistingCustomer, setIsExistingCustomer] = useState(false)
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
   const [items, setItems] = useState<ItemRow[]>([newRow()])
   const [error, setError] = useState<string | null>(null)
@@ -106,6 +107,7 @@ export function NotaCreatePanel({
     setCompanyAddress(customer.address ?? '')
     setContactPerson(customer.contact_name ?? '')
     setPhoneNumber(customer.phone_number ?? '')
+    setIsExistingCustomer(true)
     setShowCustomerSuggestions(false)
   }
 
@@ -170,8 +172,8 @@ export function NotaCreatePanel({
         </div>
       </div>
 
-      <form id="nota-form" className="space-y-4" onSubmit={handleSubmit}>
-        <div className="grid max-w-xl grid-cols-[9rem_1fr] items-center gap-x-4 gap-y-3">
+      <form id="nota-form" className="space-y-6" onSubmit={handleSubmit}>
+        <div className="grid max-w-3xl grid-cols-[9rem_1fr_9rem_1fr] items-center gap-x-8 gap-y-4">
           <Label htmlFor="nota_date" className="text-right">
             Date
           </Label>
@@ -182,6 +184,8 @@ export function NotaCreatePanel({
             onChange={(e) => setNotaDate(e.target.value)}
             required
           />
+          <div />
+          <div />
 
           <Label htmlFor="company_name" className="text-right">
             Company Name
@@ -192,6 +196,7 @@ export function NotaCreatePanel({
               value={companyName}
               onChange={(e) => {
                 setCompanyName(e.target.value)
+                setIsExistingCustomer(false)
                 setShowCustomerSuggestions(true)
               }}
               onFocus={() => setShowCustomerSuggestions(true)}
@@ -217,15 +222,6 @@ export function NotaCreatePanel({
             )}
           </div>
 
-          <Label htmlFor="company_address" className="text-right">
-            Company Address
-          </Label>
-          <Input
-            id="company_address"
-            value={companyAddress}
-            onChange={(e) => setCompanyAddress(e.target.value)}
-          />
-
           <Label htmlFor="contact_person" className="text-right">
             Contact Person
           </Label>
@@ -233,7 +229,18 @@ export function NotaCreatePanel({
             id="contact_person"
             value={contactPerson}
             onChange={(e) => setContactPerson(e.target.value)}
+            disabled={isExistingCustomer}
             required
+          />
+
+          <Label htmlFor="company_address" className="text-right">
+            Company Address
+          </Label>
+          <Input
+            id="company_address"
+            value={companyAddress}
+            onChange={(e) => setCompanyAddress(e.target.value)}
+            disabled={isExistingCustomer}
           />
 
           <Label htmlFor="phone_number" className="text-right">
@@ -243,6 +250,7 @@ export function NotaCreatePanel({
             id="phone_number"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
+            disabled={isExistingCustomer}
             required
           />
         </div>
