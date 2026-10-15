@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,6 +38,7 @@ export function MakePaymentDialog({
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function reset() {
     setPaymentDate(new Date().toISOString().slice(0, 10))
@@ -139,7 +141,7 @@ export function MakePaymentDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="payment_reference">Reference (optional)</Label>
+              <Label htmlFor="payment_reference">Notes (optional)</Label>
               <Input
                 id="payment_reference"
                 value={reference}
@@ -148,12 +150,28 @@ export function MakePaymentDialog({
             </div>
             <div className="space-y-1">
               <Label htmlFor="payment_evidence">Upload Evidence (optional)</Label>
-              <Input
+              <input
+                ref={fileInputRef}
                 id="payment_evidence"
                 type="file"
                 accept="image/png,image/jpeg,image/webp,application/pdf"
+                className="hidden"
                 onChange={(e) => setEvidenceFile(e.target.files?.[0] ?? null)}
               />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </Button>
+                <span className="truncate text-sm text-muted-foreground">
+                  {evidenceFile ? evidenceFile.name : 'No file chosen'}
+                </span>
+              </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

@@ -15,8 +15,12 @@ import { getCroppedImageBlob } from '@/lib/cropImage'
 export function BusinessSettingsPage() {
   const [businessName, setBusinessName] = useState('')
   const [businessAddress, setBusinessAddress] = useState('')
+  const [businessContactPerson, setBusinessContactPerson] = useState('')
   const [businessContactNumber, setBusinessContactNumber] = useState('')
   const [businessEmail, setBusinessEmail] = useState('')
+  const [paymentBankName, setPaymentBankName] = useState('')
+  const [paymentAccountName, setPaymentAccountName] = useState('')
+  const [paymentAccountNumber, setPaymentAccountNumber] = useState('')
   const [hasLogo, setHasLogo] = useState(false)
   const [logoVersion, setLogoVersion] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -37,8 +41,12 @@ export function BusinessSettingsPage() {
         if (!business) return
         setBusinessName(business.business_name)
         setBusinessAddress(business.business_address ?? '')
+        setBusinessContactPerson(business.business_contact_person ?? '')
         setBusinessContactNumber(business.business_contact_number ?? '')
         setBusinessEmail(business.business_email ?? '')
+        setPaymentBankName(business.payment_bank_name ?? '')
+        setPaymentAccountName(business.payment_account_name ?? '')
+        setPaymentAccountNumber(business.payment_account_number ?? '')
         setHasLogo(!!business.business_logo_key)
       })
       .finally(() => setLoading(false))
@@ -84,8 +92,12 @@ export function BusinessSettingsPage() {
       await updateBusiness({
         business_name: businessName,
         business_address: businessAddress || null,
+        business_contact_person: businessContactPerson || null,
         business_contact_number: businessContactNumber || null,
         business_email: businessEmail || null,
+        payment_bank_name: paymentBankName || null,
+        payment_account_name: paymentAccountName || null,
+        payment_account_number: paymentAccountNumber || null,
       })
       setSaved(true)
     } catch (err) {
@@ -210,6 +222,14 @@ export function BusinessSettingsPage() {
           />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="business_contact_person">Contact Person</Label>
+          <Input
+            id="business_contact_person"
+            value={businessContactPerson}
+            onChange={(e) => setBusinessContactPerson(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="business_contact_number">Contact Number</Label>
           <Input
             id="business_contact_number"
@@ -224,6 +244,31 @@ export function BusinessSettingsPage() {
             type="email"
             value={businessEmail}
             onChange={(e) => setBusinessEmail(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2 border-t pt-4">
+          <Label htmlFor="payment_bank_name">Payment Bank</Label>
+          <Input
+            id="payment_bank_name"
+            value={paymentBankName}
+            onChange={(e) => setPaymentBankName(e.target.value)}
+            placeholder="e.g. BCA"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="payment_account_name">Account Name</Label>
+          <Input
+            id="payment_account_name"
+            value={paymentAccountName}
+            onChange={(e) => setPaymentAccountName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="payment_account_number">Account Number</Label>
+          <Input
+            id="payment_account_number"
+            value={paymentAccountNumber}
+            onChange={(e) => setPaymentAccountNumber(e.target.value)}
           />
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}

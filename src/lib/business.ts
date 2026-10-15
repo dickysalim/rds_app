@@ -4,9 +4,13 @@ export interface Business {
   business_id: number
   business_name: string
   business_address: string | null
+  business_contact_person: string | null
   business_contact_number: string | null
   business_email: string | null
   business_logo_key: string | null
+  payment_bank_name: string | null
+  payment_account_name: string | null
+  payment_account_number: string | null
 }
 
 export function getBusinessLogoUrl(): string {
@@ -35,8 +39,12 @@ export async function getBusiness(): Promise<Business | null> {
 export interface BusinessInput {
   business_name: string
   business_address: string | null
+  business_contact_person: string | null
   business_contact_number: string | null
   business_email: string | null
+  payment_bank_name: string | null
+  payment_account_name: string | null
+  payment_account_number: string | null
 }
 
 export async function updateBusiness(input: BusinessInput): Promise<Business> {

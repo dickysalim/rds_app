@@ -2,6 +2,8 @@ import { API_URL, apiFetch } from '@/lib/api'
 
 export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Check', 'Other'] as const
 
+export const UNITS = ['pcs', 'box', 'pack', 'roll', 'kg', 'gram', 'liter', 'meter'] as const
+
 export interface NotaListItem {
   nota_id: number
   nota_number: string
@@ -11,6 +13,17 @@ export interface NotaListItem {
   total_price: number
   paid_amount: number
   status: string
+}
+
+export function statusPillClass(status: string): string {
+  switch (status) {
+    case 'paid':
+      return 'rounded bg-green-100 px-2 py-0.5 text-green-700'
+    case 'partial':
+      return 'rounded bg-amber-100 px-2 py-0.5 text-amber-700'
+    default:
+      return 'rounded bg-red-100 px-2 py-0.5 text-red-700'
+  }
 }
 
 export async function listNota(): Promise<NotaListItem[]> {

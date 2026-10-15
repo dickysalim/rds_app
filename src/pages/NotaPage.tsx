@@ -28,15 +28,19 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
+import { getBusiness } from '@/lib/business'
 import { formatRupiah } from '@/lib/currency'
 import {
+  getNota,
   getPaymentEvidenceUrl,
   listNota,
   listPayments,
+  statusPillClass,
   voidNota,
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
+import { downloadNotaPdf } from '@/lib/notaPdf'
 
 export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
@@ -57,6 +61,7 @@ export function NotaPage() {
   function handleSaved(created: NotaListItem) {
     setNota((prev) => [created, ...prev])
     setView('list')
+    setSelectedNotaId(created.nota_id)
   }
 
   function toggleExpand(notaId: number) {
@@ -76,6 +81,16 @@ export function NotaPage() {
     listNota()
       .then(setNota)
       .catch(() => {})
+  }
+
+  async function handleDownloadPdf(notaId: number) {
+    try {
+      const [nota, business] = await Promise.all([getNota(notaId), getBusiness()])
+      if (!business) throw new Error('Set up Business Settings first')
+      await downloadNotaPdf(nota, business)
+    } catch {
+      // ignore; user can retry from the menu
+    }
   }
 
   async function handleConfirmDelete() {
@@ -167,7 +182,9 @@ export function NotaPage() {
                       {formatRupiah(n.total_price - n.paid_amount)}
                     </TableCell>
                     <TableCell className="text-right">{formatRupiah(n.paid_amount)}</TableCell>
-                    <TableCell className="capitalize">{n.status}</TableCell>
+                    <TableCell>
+                      <span className={`capitalize ${statusPillClass(n.status)}`}>{n.status}</span>
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -181,6 +198,9 @@ export function NotaPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setPaymentDialogNotaId(n.nota_id)}>
                             Make Payment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadPdf(n.nota_id)}>
+                            Download PDF
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             variant="destructive"
@@ -201,27 +221,36 @@ export function NotaPage() {
                         ) : payments.length === 0 ? (
                           <p className="py-2 text-sm text-muted-foreground">No payments yet.</p>
                         ) : (
-                          <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                          <Table className="table-fixed text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
+                            <colgroup>
+                              <col className="w-32" />
+                              <col className="w-24" />
+                              <col className="w-32" />
+                              <col className="w-28" />
+                              <col className="w-24" />
+                              <col />
+                            </colgroup>
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Payment Number</TableHead>
                                 <TableHead>Payment Date</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead>Method</TableHead>
-                                <TableHead>Reference</TableHead>
                                 <TableHead>Evidence</TableHead>
+                                <TableHead>Notes</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {payments.map((p) => (
                                 <TableRow key={p.payment_id}>
-                                  <TableCell>{p.payment_number ?? '-'}</TableCell>
-                                  <TableCell>{p.payment_date}</TableCell>
+                                  <TableCell className="truncate">
+                                    {p.payment_number ?? '-'}
+                                  </TableCell>
+                                  <TableCell className="truncate">{p.payment_date}</TableCell>
                                   <TableCell className="text-right">
                                     {formatRupiah(p.amount)}
                                   </TableCell>
-                                  <TableCell>{p.method ?? '-'}</TableCell>
-                                  <TableCell>{p.reference ?? '-'}</TableCell>
+                                  <TableCell className="truncate">{p.method ?? '-'}</TableCell>
                                   <TableCell>
                                     {p.evidence_key ? (
                                       <a
@@ -236,6 +265,9 @@ export function NotaPage() {
                                     ) : (
                                       '-'
                                     )}
+                                  </TableCell>
+                                  <TableCell className="whitespace-normal break-words">
+                                    {p.reference ?? '-'}
                                   </TableCell>
                                 </TableRow>
                               ))}

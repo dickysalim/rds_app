@@ -12,7 +12,14 @@ import { Button } from '@/components/ui/button'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { formatRupiah } from '@/lib/currency'
-import { getPaymentEvidenceUrl, listNota, listPayments, type NotaListItem, type Payment } from '@/lib/nota'
+import {
+  getPaymentEvidenceUrl,
+  listNota,
+  listPayments,
+  statusPillClass,
+  type NotaListItem,
+  type Payment,
+} from '@/lib/nota'
 
 interface Totals {
   notaCount: number
@@ -180,7 +187,15 @@ export function HomePage() {
         <p className="text-sm text-muted-foreground">No nota yet.</p>
       ) : (
         <div className="overflow-hidden rounded-md border">
-          <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+          <Table className="table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
+            <colgroup>
+              <col />
+              <col className="w-24" />
+              <col className="w-32" />
+              <col className="w-32" />
+              <col className="w-32" />
+              <col className="w-28" />
+            </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead className="font-bold">Month</TableHead>
@@ -229,7 +244,15 @@ export function HomePage() {
                     </TableRow>
 
                     <DrawerRow open={monthOpen} colSpan={6}>
-                      <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                      <Table className="table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
+                        <colgroup>
+                          <col />
+                          <col className="w-24" />
+                          <col className="w-32" />
+                          <col className="w-32" />
+                          <col className="w-32" />
+                          <col className="w-28" />
+                        </colgroup>
                         <TableBody>
                           {month.companies.map((company) => {
                             const companyKey = `${month.key}|${company.company}`
@@ -258,9 +281,20 @@ export function HomePage() {
                                   <TableCell className="text-right">
                                     {formatRupiah(company.totalPaid)}
                                   </TableCell>
+                                  <TableCell
+                                    className={
+                                      company.totalPaid === company.totalBill
+                                        ? 'text-green-700'
+                                        : 'text-amber-700'
+                                    }
+                                  >
+                                    {company.totalPaid === company.totalBill
+                                      ? 'Settled'
+                                      : 'Unsettled'}
+                                  </TableCell>
                                 </TableRow>
 
-                                <DrawerRow open={companyOpen} colSpan={5} className="bg-background">
+                                <DrawerRow open={companyOpen} colSpan={6} className="bg-background">
                                   <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                                     <TableHeader>
                                       <TableRow>
@@ -285,20 +319,7 @@ export function HomePage() {
                                               className="h-9 cursor-pointer hover:bg-accent/50"
                                               onClick={() => setSelectedNotaId(n.nota_id)}
                                             >
-                                              <TableCell className="pl-16">
-                                                <button
-                                                  type="button"
-                                                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    toggleExpandNota(n.nota_id)
-                                                  }}
-                                                >
-                                                  <ChevronRight
-                                                    className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
-                                                  />
-                                                </button>
-                                              </TableCell>
+                                              <TableCell className="pl-16" />
                                               <TableCell>{n.nota_number}</TableCell>
                                               <TableCell>{n.nota_date}</TableCell>
                                               <TableCell className="text-right">
@@ -310,8 +331,17 @@ export function HomePage() {
                                               <TableCell className="text-right">
                                                 {formatRupiah(n.paid_amount)}
                                               </TableCell>
-                                              <TableCell className="capitalize">{n.status}</TableCell>
-                                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                              <TableCell>
+                                                <span
+                                                  className={`capitalize ${statusPillClass(n.status)}`}
+                                                >
+                                                  {n.status}
+                                                </span>
+                                              </TableCell>
+                                              <TableCell
+                                                className="space-x-2"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
                                                 {canPay && (
                                                   <Button
                                                     size="sm"
@@ -322,6 +352,15 @@ export function HomePage() {
                                                     Make Payment
                                                   </Button>
                                                 )}
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  disabled={n.status === 'unpaid'}
+                                                  className="h-6 px-2 text-xs"
+                                                  onClick={() => toggleExpandNota(n.nota_id)}
+                                                >
+                                                  See Payment
+                                                </Button>
                                               </TableCell>
                                             </TableRow>
 
@@ -330,7 +369,15 @@ export function HomePage() {
                                               colSpan={8}
                                               className="bg-muted/30 pl-28"
                                             >
-                                              <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+                                              <Table className="table-fixed text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
+                                                <colgroup>
+                                                  <col className="w-32" />
+                                                  <col className="w-24" />
+                                                  <col className="w-32" />
+                                                  <col className="w-28" />
+                                                  <col className="w-24" />
+                                                  <col />
+                                                </colgroup>
                                                 <TableHeader>
                                                   <TableRow>
                                                     <TableHead className="font-bold">
@@ -346,10 +393,10 @@ export function HomePage() {
                                                       Method
                                                     </TableHead>
                                                     <TableHead className="font-bold">
-                                                      Reference
+                                                      Evidence
                                                     </TableHead>
                                                     <TableHead className="font-bold">
-                                                      Evidence
+                                                      Notes
                                                     </TableHead>
                                                   </TableRow>
                                                 </TableHeader>
@@ -375,15 +422,18 @@ export function HomePage() {
                                                   ) : (
                                                     payments.map((p) => (
                                                       <TableRow key={p.payment_id}>
-                                                        <TableCell>
+                                                        <TableCell className="truncate">
                                                           {p.payment_number ?? '-'}
                                                         </TableCell>
-                                                        <TableCell>{p.payment_date}</TableCell>
+                                                        <TableCell className="truncate">
+                                                          {p.payment_date}
+                                                        </TableCell>
                                                         <TableCell className="text-right">
                                                           {formatRupiah(p.amount)}
                                                         </TableCell>
-                                                        <TableCell>{p.method ?? '-'}</TableCell>
-                                                        <TableCell>{p.reference ?? '-'}</TableCell>
+                                                        <TableCell className="truncate">
+                                                          {p.method ?? '-'}
+                                                        </TableCell>
                                                         <TableCell>
                                                           {p.evidence_key ? (
                                                             <a
@@ -401,6 +451,9 @@ export function HomePage() {
                                                           ) : (
                                                             '-'
                                                           )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-normal break-words">
+                                                          {p.reference ?? '-'}
                                                         </TableCell>
                                                       </TableRow>
                                                     ))
