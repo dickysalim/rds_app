@@ -1,5 +1,5 @@
-import { ChevronRight, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { ChevronRight, Download, MoreHorizontal } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -47,6 +48,7 @@ import {
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
+import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
@@ -63,14 +65,41 @@ interface CompanyGroup extends Totals {
   nota: NotaListItem[]
 }
 
-interface MonthGroup extends Totals {
-  key: string
+interface SettlementGroup extends Totals {
+  key: 'unsettled' | 'settled'
   label: string
   companies: CompanyGroup[]
 }
 
+interface MonthGroup extends Totals {
+  key: string
+  label: string
+  settlementGroups: SettlementGroup[]
+}
+
 function outstandingOf(n: NotaListItem): number {
   return n.status === 'void' ? 0 : n.total_price - n.paid_amount
+}
+
+function isSettled(n: NotaListItem): boolean {
+  return outstandingOf(n) === 0
+}
+
+function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
+  const companies = new Map<string, NotaListItem[]>()
+  for (const n of nota) {
+    const list = companies.get(n.customer_company_name_snapshot) ?? []
+    list.push(n)
+    companies.set(n.customer_company_name_snapshot, list)
+  }
+
+  return Array.from(companies.entries())
+    .map(([company, list]) => ({
+      company,
+      nota: [...list].sort((a, b) => (a.nota_date < b.nota_date ? 1 : -1)),
+      ...sumTotals(list),
+    }))
+    .sort((a, b) => b.totalUnpaid - a.totalUnpaid || a.company.localeCompare(b.company))
 }
 
 function sumTotals(nota: NotaListItem[]): Totals {
@@ -101,20 +130,28 @@ function groupByMonth(nota: NotaListItem[]): MonthGroup[] {
       year: 'numeric',
     })
 
-    const companyGroups: CompanyGroup[] = Array.from(companies.entries())
-      .map(([company, list]) => ({
-        company,
-        nota: [...list].sort((a, b) => (a.nota_date < b.nota_date ? 1 : -1)),
-        ...sumTotals(list),
-      }))
-      .sort((a, b) => b.totalUnpaid - a.totalUnpaid || a.company.localeCompare(b.company))
+    const allNotaInMonth = Array.from(companies.values()).flat()
+    const unsettled = allNotaInMonth.filter((n) => !isSettled(n))
+    const settled = allNotaInMonth.filter((n) => isSettled(n))
 
-    const allNotaInMonth = companyGroups.flatMap((c) => c.nota)
+    const settlementGroups: SettlementGroup[] = (
+      [
+        { key: 'unsettled' as const, label: 'Unsettled', nota: unsettled },
+        { key: 'settled' as const, label: 'Settled', nota: settled },
+      ] as const
+    )
+      .filter((g) => g.nota.length > 0)
+      .map((g) => ({
+        key: g.key,
+        label: g.label,
+        companies: groupByCompany(g.nota),
+        ...sumTotals(g.nota),
+      }))
 
     return {
       key: monthKey,
       label,
-      companies: companyGroups,
+      settlementGroups,
       ...sumTotals(allNotaInMonth),
     }
   })
@@ -165,11 +202,16 @@ export function MonthlyNotaView({
   const [status, setStatus] = useState('all')
   const [year, setYear] = useState(String(CURRENT_YEAR))
   const [openMonth, setOpenMonth] = useState<string | null>(null)
+  const [openSettlement, setOpenSettlement] = useState<string | null>(null)
   const [openCompany, setOpenCompany] = useState<string | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
+  const [paymentPdfUrl, setPaymentPdfUrl] = useState<string | null>(null)
+  const [paymentPdfLoading, setPaymentPdfLoading] = useState(false)
+  const [paymentPdfError, setPaymentPdfError] = useState<string | null>(null)
+  const paymentPdfBlobRef = useRef<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -196,6 +238,13 @@ export function MonthlyNotaView({
 
   function toggleMonth(key: string) {
     setOpenMonth((prev) => (prev === key ? null : key))
+    setOpenSettlement(null)
+    setOpenCompany(null)
+    setExpandedNotaId(null)
+  }
+
+  function toggleSettlement(key: string) {
+    setOpenSettlement((prev) => (prev === key ? null : key))
     setOpenCompany(null)
     setExpandedNotaId(null)
   }
@@ -241,6 +290,33 @@ export function MonthlyNotaView({
       refetch()
     } catch {
       // ignore; nota stays in list
+    }
+  }
+
+  function closePaymentPdf() {
+    if (paymentPdfBlobRef.current) {
+      URL.revokeObjectURL(paymentPdfBlobRef.current)
+      paymentPdfBlobRef.current = null
+    }
+    setPaymentPdfUrl(null)
+    setPaymentPdfError(null)
+  }
+
+  async function handleSeePaymentPdf(notaId: number, payment: Payment) {
+    setPaymentPdfLoading(true)
+    setPaymentPdfError(null)
+    setPaymentPdfUrl(null)
+    try {
+      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
+      if (!business) throw new Error('Set up Business Settings first')
+      const url = await previewPaymentPdfUrl(notaDetail, payment, business)
+      if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
+      paymentPdfBlobRef.current = url
+      setPaymentPdfUrl(url)
+    } catch (err) {
+      setPaymentPdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
+    } finally {
+      setPaymentPdfLoading(false)
     }
   }
 
@@ -369,47 +445,97 @@ export function MonthlyNotaView({
                           <col className="w-28" />
                         </colgroup>
                         <TableBody>
-                          {month.companies.map((company) => {
-                            const companyKey = `${month.key}|${company.company}`
-                            const companyOpen = openCompany === companyKey
+                          {month.settlementGroups.map((settlement) => {
+                            const settlementKey = `${month.key}|${settlement.key}`
+                            const settlementOpen = openSettlement === settlementKey
                             return (
-                              <Fragment key={companyKey}>
+                              <Fragment key={settlementKey}>
                                 <TableRow
-                                  className="h-9 cursor-pointer bg-muted/30 hover:bg-muted/50"
-                                  onClick={() => toggleCompany(companyKey)}
+                                  className="h-9 cursor-pointer bg-muted/20 font-semibold hover:bg-muted/40"
+                                  onClick={() => toggleSettlement(settlementKey)}
                                 >
-                                  <TableCell className="w-auto pl-12">
+                                  <TableCell
+                                    className={`w-auto pl-7 ${settlement.key === 'settled' ? 'text-green-700' : 'text-amber-700'}`}
+                                  >
                                     <div className="flex items-center gap-2">
                                       <ChevronRight
-                                        className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${companyOpen ? 'rotate-90' : ''}`}
+                                        className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${settlementOpen ? 'rotate-90' : ''}`}
                                       />
-                                      {company.company}
+                                      {settlement.label}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right">{company.notaCount}</TableCell>
                                   <TableCell className="text-right">
-                                    {formatRupiah(company.totalBill)}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatRupiah(company.totalUnpaid)}
+                                    {settlement.notaCount}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    {formatRupiah(company.totalPaid)}
+                                    {formatRupiah(settlement.totalBill)}
                                   </TableCell>
-                                  <TableCell
-                                    className={
-                                      company.totalPaid === company.totalBill
-                                        ? 'text-green-700'
-                                        : 'text-amber-700'
-                                    }
-                                  >
-                                    {company.totalPaid === company.totalBill
-                                      ? 'Settled'
-                                      : 'Unsettled'}
+                                  <TableCell className="text-right">
+                                    {formatRupiah(settlement.totalUnpaid)}
                                   </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatRupiah(settlement.totalPaid)}
+                                  </TableCell>
+                                  <TableCell />
                                 </TableRow>
 
-                                <DrawerRow open={companyOpen} colSpan={6} className="bg-background">
+                                <DrawerRow open={settlementOpen} colSpan={6}>
+                                  <Table className="table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
+                                    <colgroup>
+                                      <col />
+                                      <col className="w-24" />
+                                      <col className="w-32" />
+                                      <col className="w-32" />
+                                      <col className="w-32" />
+                                      <col className="w-28" />
+                                    </colgroup>
+                                    <TableBody>
+                                      {settlement.companies.map((company) => {
+                                        const companyKey = `${settlementKey}|${company.company}`
+                                        const companyOpen = openCompany === companyKey
+                                        return (
+                                          <Fragment key={companyKey}>
+                                            <TableRow
+                                              className="h-9 cursor-pointer bg-muted/30 hover:bg-muted/50"
+                                              onClick={() => toggleCompany(companyKey)}
+                                            >
+                                              <TableCell className="w-auto pl-12">
+                                                <div className="flex items-center gap-2">
+                                                  <ChevronRight
+                                                    className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${companyOpen ? 'rotate-90' : ''}`}
+                                                  />
+                                                  {company.company}
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                {company.notaCount}
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                {formatRupiah(company.totalBill)}
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                {formatRupiah(company.totalUnpaid)}
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                {formatRupiah(company.totalPaid)}
+                                              </TableCell>
+                                              <TableCell
+                                                className={
+                                                  company.totalPaid === company.totalBill
+                                                    ? 'text-green-700'
+                                                    : 'text-amber-700'
+                                                }
+                                              >
+                                                {company.totalPaid === company.totalBill
+                                                  ? 'Settled'
+                                                  : 'Unsettled'}
+                                              </TableCell>
+                                            </TableRow>
+
+                                            <DrawerRow
+                                              open={companyOpen}
+                                              colSpan={6}
+                                              className="bg-background">
                                   <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
                                     <TableHeader>
                                       <TableRow>
@@ -501,7 +627,7 @@ export function MonthlyNotaView({
                                               colSpan={8}
                                               className="bg-muted/30 pl-28"
                                             >
-                                              <Table className="table-fixed text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
+                                              <Table className="w-auto text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
                                                 <colgroup>
                                                   <col className="w-32" />
                                                   <col className="w-24" />
@@ -509,6 +635,7 @@ export function MonthlyNotaView({
                                                   <col className="w-28" />
                                                   <col className="w-24" />
                                                   <col />
+                                                  <col className="w-8" />
                                                 </colgroup>
                                                 <TableHeader>
                                                   <TableRow>
@@ -530,13 +657,14 @@ export function MonthlyNotaView({
                                                     <TableHead className="font-bold">
                                                       Notes
                                                     </TableHead>
+                                                    <TableHead className="w-8" />
                                                   </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                   {!payments ? (
                                                     <TableRow>
                                                       <TableCell
-                                                        colSpan={6}
+                                                        colSpan={7}
                                                         className="text-center text-muted-foreground"
                                                       >
                                                         Loading payments…
@@ -545,7 +673,7 @@ export function MonthlyNotaView({
                                                   ) : payments.length === 0 ? (
                                                     <TableRow>
                                                       <TableCell
-                                                        colSpan={6}
+                                                        colSpan={7}
                                                         className="text-center text-muted-foreground"
                                                       >
                                                         No Payment Yet
@@ -587,6 +715,20 @@ export function MonthlyNotaView({
                                                         <TableCell className="whitespace-normal break-words">
                                                           {p.reference ?? '-'}
                                                         </TableCell>
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                          <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2"
+                                                            onClick={() =>
+                                                              handleSeePaymentPdf(n.nota_id, p)
+                                                            }
+                                                          >
+                                                            <Download className="h-3.5 w-3.5" />
+                                                            Download PDF
+                                                          </Button>
+                                                        </TableCell>
                                                       </TableRow>
                                                     ))
                                                   )}
@@ -608,6 +750,12 @@ export function MonthlyNotaView({
                   </Fragment>
                 )
               })}
+            </TableBody>
+          </Table>
+        </DrawerRow>
+      </Fragment>
+    )
+  })}
             </TableBody>
           </Table>
         </div>
@@ -637,6 +785,28 @@ export function MonthlyNotaView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={paymentPdfLoading || paymentPdfUrl !== null || paymentPdfError !== null}
+        onOpenChange={(open) => !open && closePaymentPdf()}
+      >
+        <DialogContent className="max-w-3xl sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Bukti Pembayaran</DialogTitle>
+          </DialogHeader>
+          {paymentPdfLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
+          ) : paymentPdfError ? (
+            <p className="py-8 text-center text-sm text-destructive">{paymentPdfError}</p>
+          ) : paymentPdfUrl ? (
+            <iframe
+              title="Payment PDF"
+              src={paymentPdfUrl}
+              className="h-[60vh] w-full rounded-md border"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
