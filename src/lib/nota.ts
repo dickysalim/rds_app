@@ -31,10 +31,21 @@ export interface NotaPage {
   total: number
 }
 
-export async function listNota(params?: { limit?: number; offset?: number }): Promise<NotaPage> {
+export async function listNota(params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  status?: string
+  year?: string
+  month?: string
+}): Promise<NotaPage> {
   const query = new URLSearchParams()
   if (params?.limit != null) query.set('limit', String(params.limit))
   if (params?.offset != null) query.set('offset', String(params.offset))
+  if (params?.q) query.set('q', params.q)
+  if (params?.status) query.set('status', params.status)
+  if (params?.year) query.set('year', params.year)
+  if (params?.month) query.set('month', params.month)
   const qs = query.toString()
   const res = await apiFetch(`/nota${qs ? `?${qs}` : ''}`)
   if (!res.ok) throw new Error('Failed to load nota')

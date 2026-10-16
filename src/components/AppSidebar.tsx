@@ -1,4 +1,4 @@
-import { Home, Receipt, Users, Package, Settings } from 'lucide-react'
+import { Receipt, Users, Package, Settings } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Sidebar,
@@ -18,7 +18,6 @@ import type { AuthUser } from '@/lib/auth'
 import { useNavGuard } from '@/lib/nav-guard'
 
 const items = [
-  { title: 'Home', url: '/', icon: Home },
   { title: 'Nota', url: '/nota', icon: Receipt },
   { title: 'Customer', url: '/customer', icon: Users },
   { title: 'Product', url: '/product', icon: Package },

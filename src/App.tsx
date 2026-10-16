@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from '@/components/AppLayout'
 import { LoginForm } from '@/components/LoginForm'
-import { HomePage } from '@/pages/HomePage'
 import { NotaPage } from '@/pages/NotaPage'
 import { CustomerPage } from '@/pages/CustomerPage'
 import { ProductPage } from '@/pages/ProductPage'
@@ -50,7 +49,7 @@ function App() {
             />
           }
         >
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Navigate to="/nota" replace />} />
           <Route path="/nota" element={<NotaPageRoute />} />
           <Route path="/customer" element={<CustomerPage />} />
           <Route path="/product" element={<ProductPage />} />

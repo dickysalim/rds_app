@@ -17,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -36,6 +37,7 @@ export function ProductPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     listProducts()
@@ -62,10 +64,21 @@ export function ProductPage() {
     }
   }
 
+  const filteredProducts = products.filter((p) =>
+    p.sku_name.toLowerCase().includes(search.trim().toLowerCase()),
+  )
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Product</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Product</h1>
+
+      <div className="flex items-center justify-between gap-2">
+        <Input
+          placeholder="Search SKU name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-80"
+        />
         <Button
           onClick={() => {
             setEditingProduct(null)
@@ -91,14 +104,14 @@ export function ProductPage() {
                 Loading…
               </TableCell>
             </TableRow>
-          ) : products.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center text-muted-foreground">
-                No products yet.
+                {search ? 'No matching products.' : 'No products yet.'}
               </TableCell>
             </TableRow>
           ) : (
-            products.map((product) => (
+            filteredProducts.map((product) => (
               <TableRow key={product.sku_id}>
                 <TableCell>{product.sku_id}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>

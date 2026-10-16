@@ -18,6 +18,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -26,7 +34,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
+import { MonthlyNotaView } from '@/components/MonthlyNotaView'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { getBusiness } from '@/lib/business'
@@ -46,10 +56,33 @@ import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
 
 const PAGE_SIZE = 25
 
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
+
+const CURRENT_YEAR = new Date().getFullYear()
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
+
 export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [status, setStatus] = useState('all')
+  const [month, setMonth] = useState('all')
+  const [year, setYear] = useState('all')
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'list' | 'create'>('list')
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
@@ -62,9 +95,25 @@ export function NotaPage() {
   const [paymentPdfError, setPaymentPdfError] = useState<string | null>(null)
   const paymentPdfBlobRef = useRef<string | null>(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, status, month, year])
+
   function refetch(targetPage: number) {
     setLoading(true)
-    listNota({ limit: PAGE_SIZE, offset: (targetPage - 1) * PAGE_SIZE })
+    listNota({
+      limit: PAGE_SIZE,
+      offset: (targetPage - 1) * PAGE_SIZE,
+      q: debouncedSearch || undefined,
+      status: status !== 'all' ? status : undefined,
+      month: month !== 'all' ? month : undefined,
+      year: year !== 'all' ? year : undefined,
+    })
       .then(({ nota: rows, total: rowTotal }) => {
         setNota(rows)
         setTotal(rowTotal)
@@ -75,7 +124,7 @@ export function NotaPage() {
   useEffect(() => {
     refetch(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
+  }, [page, debouncedSearch, status, month, year])
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -162,10 +211,79 @@ export function NotaPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
+
+      <Tabs defaultValue="nota">
+        <TabsList>
+          <TabsTrigger value="nota">Nota View</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly View</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="nota" className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search customer or contact name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-80"
+          />
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All months</SelectItem>
+              {MONTH_OPTIONS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-28">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All years</SelectItem>
+              {YEAR_OPTIONS.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(search || status !== 'all' || month !== 'all' || year !== 'all') && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setStatus('all')
+                setMonth('all')
+                setYear('all')
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
       </div>
+
       <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
@@ -375,6 +493,12 @@ export function NotaPage() {
           </Button>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="monthly">
+          <MonthlyNotaView onAddNota={() => setView('create')} onSelectNota={setSelectedNotaId} />
+        </TabsContent>
+      </Tabs>
 
       {paymentDialogNotaId !== null && (
         <MakePaymentDialog

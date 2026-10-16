@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -35,6 +36,7 @@ export function CustomerPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     listCustomers()
@@ -63,10 +65,26 @@ export function CustomerPage() {
     }
   }
 
+  const filteredCustomers = customers.filter((c) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return (
+      c.company_name.toLowerCase().includes(q) ||
+      (c.contact_name ?? '').toLowerCase().includes(q)
+    )
+  })
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Customer</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Customer</h1>
+
+      <div className="flex items-center justify-between gap-2">
+        <Input
+          placeholder="Search company or contact name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-80"
+        />
         <Button
           onClick={() => {
             setEditingCustomer(null)
@@ -94,14 +112,14 @@ export function CustomerPage() {
                 Loading…
               </TableCell>
             </TableRow>
-          ) : customers.length === 0 ? (
+          ) : filteredCustomers.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground">
-                No customers yet.
+                {search ? 'No matching customers.' : 'No customers yet.'}
               </TableCell>
             </TableRow>
           ) : (
-            customers
+            filteredCustomers
               .slice()
               .sort((a, b) => a.customer_id - b.customer_id)
               .map((customer) => (

@@ -1,5 +1,5 @@
 import { ChevronRight, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,6 +10,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -25,7 +34,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
-import { NotaDetailPanel } from '@/components/NotaDetailPanel'
 import { getBusiness } from '@/lib/business'
 import { formatRupiah } from '@/lib/currency'
 import { downloadNotaPdf } from '@/lib/notaPdf'
@@ -39,6 +47,9 @@ import {
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
+
+const CURRENT_YEAR = new Date().getFullYear()
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
 
 interface Totals {
   notaCount: number
@@ -140,28 +151,48 @@ function DrawerRow({
   )
 }
 
-export function HomePage() {
+export function MonthlyNotaView({
+  onAddNota,
+  onSelectNota,
+}: {
+  onAddNota: () => void
+  onSelectNota: (notaId: number) => void
+}) {
   const [nota, setNota] = useState<NotaListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [status, setStatus] = useState('all')
+  const [year, setYear] = useState(String(CURRENT_YEAR))
   const [openMonth, setOpenMonth] = useState<string | null>(null)
   const [openCompany, setOpenCompany] = useState<string | null>(null)
-  const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
 
   useEffect(() => {
-    listNota()
-      .then(({ nota: rows }) => {
-        setNota(rows)
-        const months = groupByMonth(rows)
-        if (months[0]) setOpenMonth(months[0].key)
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const months = useMemo(() => groupByMonth(nota), [nota])
+  function refetch() {
+    setLoading(true)
+    listNota({
+      q: debouncedSearch || undefined,
+      status: status !== 'all' ? status : undefined,
+      year: year !== 'all' ? year : undefined,
+    })
+      .then(({ nota: rows }) => setNota(rows))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    refetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, status, year])
+
+  const months = groupByMonth(nota)
 
   function toggleMonth(key: string) {
     setOpenMonth((prev) => (prev === key ? null : key))
@@ -188,16 +219,14 @@ export function HomePage() {
     listPayments(notaId)
       .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
       .catch(() => {})
-    listNota()
-      .then(({ nota: rows }) => setNota(rows))
-      .catch(() => {})
+    refetch()
   }
 
   async function handleDownloadPdf(notaId: number) {
     try {
-      const [nota, business] = await Promise.all([getNota(notaId), getBusiness()])
+      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
       if (!business) throw new Error('Set up Business Settings first')
-      await downloadNotaPdf(nota, business)
+      await downloadNotaPdf(notaDetail, business)
     } catch {
       // ignore; user can retry from the row
     }
@@ -209,24 +238,68 @@ export function HomePage() {
     setDeleteNotaId(null)
     try {
       await voidNota(notaId)
-      setNota((prev) => prev.filter((n) => n.nota_id !== notaId))
+      refetch()
     } catch {
       // ignore; nota stays in list
     }
   }
 
-  if (selectedNotaId !== null) {
-    return <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
-  }
-
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search customer or contact name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-80"
+          />
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-28">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All years</SelectItem>
+              {YEAR_OPTIONS.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(search || status !== 'all' || year !== String(CURRENT_YEAR)) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setStatus('all')
+                setYear(String(CURRENT_YEAR))
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        <Button onClick={onAddNota}>+ Add Nota</Button>
+      </div>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : months.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No nota yet.</p>
+        <p className="text-sm text-muted-foreground">No nota found.</p>
       ) : (
         <div className="overflow-hidden rounded-md border">
           <Table className="table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
@@ -359,7 +432,7 @@ export function HomePage() {
                                           <Fragment key={n.nota_id}>
                                             <TableRow
                                               className="h-9 cursor-pointer hover:bg-accent/50"
-                                              onClick={() => setSelectedNotaId(n.nota_id)}
+                                              onClick={() => onSelectNota(n.nota_id)}
                                             >
                                               <TableCell className="pl-16" />
                                               <TableCell>{n.nota_number}</TableCell>
