@@ -1,5 +1,15 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Table,
   TableBody,
@@ -8,15 +18,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
+import { getBusiness } from '@/lib/business'
 import { formatRupiah } from '@/lib/currency'
+import { downloadNotaPdf } from '@/lib/notaPdf'
 import {
+  getNota,
   getPaymentEvidenceUrl,
   listNota,
   listPayments,
   statusPillClass,
+  voidNota,
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
@@ -130,6 +149,7 @@ export function HomePage() {
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
+  const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
 
   useEffect(() => {
     listNota()
@@ -171,6 +191,28 @@ export function HomePage() {
     listNota()
       .then(setNota)
       .catch(() => {})
+  }
+
+  async function handleDownloadPdf(notaId: number) {
+    try {
+      const [nota, business] = await Promise.all([getNota(notaId), getBusiness()])
+      if (!business) throw new Error('Set up Business Settings first')
+      await downloadNotaPdf(nota, business)
+    } catch {
+      // ignore; user can retry from the row
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (deleteNotaId === null) return
+    const notaId = deleteNotaId
+    setDeleteNotaId(null)
+    try {
+      await voidNota(notaId)
+      setNota((prev) => prev.filter((n) => n.nota_id !== notaId))
+    } catch {
+      // ignore; nota stays in list
+    }
   }
 
   if (selectedNotaId !== null) {
@@ -305,14 +347,14 @@ export function HomePage() {
                                         <TableHead className="text-right font-bold">Unpaid</TableHead>
                                         <TableHead className="text-right font-bold">Paid</TableHead>
                                         <TableHead className="font-bold">Status</TableHead>
-                                        <TableHead className="font-bold">Action</TableHead>
+                                        <TableHead className="w-px whitespace-nowrap" />
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                       {company.nota.map((n) => {
                                         const isExpanded = expandedNotaId === n.nota_id
                                         const payments = paymentsByNota[n.nota_id]
-                                        const canPay = n.status === 'unpaid' || n.status === 'partial'
+                                        const canSeePayment = n.status !== 'unpaid'
                                         return (
                                           <Fragment key={n.nota_id}>
                                             <TableRow
@@ -339,28 +381,45 @@ export function HomePage() {
                                                 </span>
                                               </TableCell>
                                               <TableCell
-                                                className="space-x-2"
+                                                className="relative left-[-8px] flex items-center gap-3 whitespace-nowrap pl-0"
                                                 onClick={(e) => e.stopPropagation()}
                                               >
-                                                {canPay && (
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-6 px-2 text-xs"
-                                                    onClick={() => setPaymentDialogNotaId(n.nota_id)}
-                                                  >
-                                                    Make Payment
-                                                  </Button>
-                                                )}
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  disabled={n.status === 'unpaid'}
-                                                  className="h-6 px-2 text-xs"
+                                                <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild>
+                                                    <button
+                                                      type="button"
+                                                      className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
+                                                    >
+                                                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                                                    </button>
+                                                  </DropdownMenuTrigger>
+                                                  <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem
+                                                      onClick={() => setPaymentDialogNotaId(n.nota_id)}
+                                                    >
+                                                      Make Payment
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                      onClick={() => handleDownloadPdf(n.nota_id)}
+                                                    >
+                                                      Download PDF
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                      variant="destructive"
+                                                      onClick={() => setDeleteNotaId(n.nota_id)}
+                                                    >
+                                                      Delete
+                                                    </DropdownMenuItem>
+                                                  </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <button
+                                                  type="button"
+                                                  className={`text-xs text-primary underline ${canSeePayment ? '' : 'invisible pointer-events-none'}`}
+                                                  tabIndex={canSeePayment ? undefined : -1}
                                                   onClick={() => toggleExpandNota(n.nota_id)}
                                                 >
                                                   See Payment
-                                                </Button>
+                                                </button>
                                               </TableCell>
                                             </TableRow>
 
@@ -489,6 +548,22 @@ export function HomePage() {
           onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
         />
       )}
+
+      <AlertDialog open={deleteNotaId !== null} onOpenChange={(open) => !open && setDeleteNotaId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this nota?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will be hidden from the list but kept in records. This can&apos;t be undone from
+              here.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

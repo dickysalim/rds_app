@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,7 @@ import {
   type Payment,
 } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
+import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
 
 export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
@@ -51,6 +53,10 @@ export function NotaPage() {
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
   const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
+  const [paymentPdfUrl, setPaymentPdfUrl] = useState<string | null>(null)
+  const [paymentPdfLoading, setPaymentPdfLoading] = useState(false)
+  const [paymentPdfError, setPaymentPdfError] = useState<string | null>(null)
+  const paymentPdfBlobRef = useRef<string | null>(null)
 
   useEffect(() => {
     listNota()
@@ -90,6 +96,33 @@ export function NotaPage() {
       await downloadNotaPdf(nota, business)
     } catch {
       // ignore; user can retry from the menu
+    }
+  }
+
+  function closePaymentPdf() {
+    if (paymentPdfBlobRef.current) {
+      URL.revokeObjectURL(paymentPdfBlobRef.current)
+      paymentPdfBlobRef.current = null
+    }
+    setPaymentPdfUrl(null)
+    setPaymentPdfError(null)
+  }
+
+  async function handleSeePaymentPdf(notaId: number, payment: Payment) {
+    setPaymentPdfLoading(true)
+    setPaymentPdfError(null)
+    setPaymentPdfUrl(null)
+    try {
+      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
+      if (!business) throw new Error('Set up Business Settings first')
+      const url = await previewPaymentPdfUrl(notaDetail, payment, business)
+      if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
+      paymentPdfBlobRef.current = url
+      setPaymentPdfUrl(url)
+    } catch (err) {
+      setPaymentPdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
+    } finally {
+      setPaymentPdfLoading(false)
     }
   }
 
@@ -221,7 +254,7 @@ export function NotaPage() {
                         ) : payments.length === 0 ? (
                           <p className="py-2 text-sm text-muted-foreground">No payments yet.</p>
                         ) : (
-                          <Table className="table-fixed text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
+                          <Table className="w-auto text-xs [&_th]:h-8 [&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-1.5">
                             <colgroup>
                               <col className="w-32" />
                               <col className="w-24" />
@@ -229,6 +262,7 @@ export function NotaPage() {
                               <col className="w-28" />
                               <col className="w-24" />
                               <col />
+                              <col className="w-8" />
                             </colgroup>
                             <TableHeader>
                               <TableRow>
@@ -238,6 +272,7 @@ export function NotaPage() {
                                 <TableHead>Method</TableHead>
                                 <TableHead>Evidence</TableHead>
                                 <TableHead>Notes</TableHead>
+                                <TableHead className="w-8" />
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -268,6 +303,18 @@ export function NotaPage() {
                                   </TableCell>
                                   <TableCell className="whitespace-normal break-words">
                                     {p.reference ?? '-'}
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2"
+                                      onClick={() => handleSeePaymentPdf(n.nota_id, p)}
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      Download PDF
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -308,6 +355,28 @@ export function NotaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={paymentPdfLoading || paymentPdfUrl !== null || paymentPdfError !== null}
+        onOpenChange={(open) => !open && closePaymentPdf()}
+      >
+        <DialogContent className="max-w-3xl sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Bukti Pembayaran</DialogTitle>
+          </DialogHeader>
+          {paymentPdfLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
+          ) : paymentPdfError ? (
+            <p className="py-8 text-center text-sm text-destructive">{paymentPdfError}</p>
+          ) : paymentPdfUrl ? (
+            <iframe
+              title="Payment PDF"
+              src={paymentPdfUrl}
+              className="h-[60vh] w-full rounded-md border"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
