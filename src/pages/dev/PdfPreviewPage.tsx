@@ -65,7 +65,7 @@ export function PdfPreviewPage() {
   const blobUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
-    listNota().then(setNotaList)
+    listNota().then(({ nota: rows }) => setNotaList(rows))
     getBusiness().then(setBusiness)
   }, [])
 

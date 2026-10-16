@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
@@ -44,8 +44,12 @@ import {
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
 
+const PAGE_SIZE = 25
+
 export function NotaPage() {
   const [nota, setNota] = useState<NotaListItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'list' | 'create'>('list')
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
@@ -58,16 +62,28 @@ export function NotaPage() {
   const [paymentPdfError, setPaymentPdfError] = useState<string | null>(null)
   const paymentPdfBlobRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    listNota()
-      .then(setNota)
+  function refetch(targetPage: number) {
+    setLoading(true)
+    listNota({ limit: PAGE_SIZE, offset: (targetPage - 1) * PAGE_SIZE })
+      .then(({ nota: rows, total: rowTotal }) => {
+        setNota(rows)
+        setTotal(rowTotal)
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => {
+    refetch(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function handleSaved(created: NotaListItem) {
-    setNota((prev) => [created, ...prev])
     setView('list')
     setSelectedNotaId(created.nota_id)
+    setPage(1)
+    refetch(1)
   }
 
   function toggleExpand(notaId: number) {
@@ -84,9 +100,7 @@ export function NotaPage() {
     listPayments(notaId)
       .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
       .catch(() => {})
-    listNota()
-      .then(setNota)
-      .catch(() => {})
+    refetch(page)
   }
 
   async function handleDownloadPdf(notaId: number) {
@@ -132,7 +146,7 @@ export function NotaPage() {
     setDeleteNotaId(null)
     try {
       await voidNota(notaId)
-      setNota((prev) => prev.filter((n) => n.nota_id !== notaId))
+      refetch(page)
     } catch {
       // ignore; nota stays in list
     }
@@ -330,6 +344,37 @@ export function NotaPage() {
           )}
         </TableBody>
       </Table>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {total === 0
+            ? 'No nota yet.'
+            : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span>
+            Page {page} of {pageCount}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={page >= pageCount || loading}
+            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {paymentDialogNotaId !== null && (
         <MakePaymentDialog

@@ -153,7 +153,7 @@ export function HomePage() {
 
   useEffect(() => {
     listNota()
-      .then((rows) => {
+      .then(({ nota: rows }) => {
         setNota(rows)
         const months = groupByMonth(rows)
         if (months[0]) setOpenMonth(months[0].key)
@@ -189,7 +189,7 @@ export function HomePage() {
       .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
       .catch(() => {})
     listNota()
-      .then(setNota)
+      .then(({ nota: rows }) => setNota(rows))
       .catch(() => {})
   }
 

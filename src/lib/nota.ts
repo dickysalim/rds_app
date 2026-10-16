@@ -26,11 +26,20 @@ export function statusPillClass(status: string): string {
   }
 }
 
-export async function listNota(): Promise<NotaListItem[]> {
-  const res = await apiFetch('/nota')
+export interface NotaPage {
+  nota: NotaListItem[]
+  total: number
+}
+
+export async function listNota(params?: { limit?: number; offset?: number }): Promise<NotaPage> {
+  const query = new URLSearchParams()
+  if (params?.limit != null) query.set('limit', String(params.limit))
+  if (params?.offset != null) query.set('offset', String(params.offset))
+  const qs = query.toString()
+  const res = await apiFetch(`/nota${qs ? `?${qs}` : ''}`)
   if (!res.ok) throw new Error('Failed to load nota')
-  const data = (await res.json()) as { nota: NotaListItem[] }
-  return data.nota
+  const data = (await res.json()) as { nota: NotaListItem[]; total: number }
+  return { nota: data.nota, total: data.total }
 }
 
 export interface NotaItemInput {
