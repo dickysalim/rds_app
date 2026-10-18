@@ -46,6 +46,7 @@ import {
   queryKeys,
   useBusinessQuery,
   useCustomersQuery,
+  useNotaDateRangeQuery,
   useNotaListQuery,
   useVoidNotaMutation,
 } from '@/lib/queries'
@@ -175,6 +176,19 @@ export function CompanyOverviewView({
   })
   const nota = notaPage?.nota ?? []
 
+  const { data: dateRange } = useNotaDateRangeQuery()
+  const monthKey = selectedYear * 12 + selectedMonth
+  const minMonthKey =
+    dateRange?.minYear != null && dateRange?.minMonth != null
+      ? dateRange.minYear * 12 + dateRange.minMonth
+      : null
+  const maxMonthKey =
+    dateRange?.maxYear != null && dateRange?.maxMonth != null
+      ? dateRange.maxYear * 12 + dateRange.maxMonth
+      : null
+  const atEarliest = minMonthKey != null && monthKey <= minMonthKey
+  const atLatest = maxMonthKey != null && monthKey >= maxMonthKey
+
   const allCompanies = groupByCompany(nota)
   const companies = allCompanies.filter((c) => {
     if (status === 'all') return true
@@ -187,6 +201,8 @@ export function CompanyOverviewView({
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 
   function shiftMonth(delta: number) {
+    if (delta < 0 && atEarliest) return
+    if (delta > 0 && atLatest) return
     setOpenCompany(null)
     let m = selectedMonth + delta
     let y = selectedYear
@@ -347,11 +363,23 @@ export function CompanyOverviewView({
   return (
     <div className="space-y-4 pb-[40vh]">
       <div className="flex items-center justify-center gap-6 rounded-lg border border-[oklch(0.8_0_0)] bg-white py-4">
-        <Button type="button" variant="default" size="icon" onClick={() => shiftMonth(-1)}>
+        <Button
+          type="button"
+          variant="default"
+          size="icon"
+          disabled={atEarliest}
+          onClick={() => shiftMonth(-1)}
+        >
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <span className="w-56 text-center text-2xl font-bold">{monthLabel}</span>
-        <Button type="button" variant="default" size="icon" onClick={() => shiftMonth(1)}>
+        <Button
+          type="button"
+          variant="default"
+          size="icon"
+          disabled={atLatest}
+          onClick={() => shiftMonth(1)}
+        >
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>

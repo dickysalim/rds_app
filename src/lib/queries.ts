@@ -19,6 +19,7 @@ import {
   createBillPayment,
   createNota,
   getNota,
+  getNotaDateRange,
   listBillPayments,
   listNota,
   voidNota,
@@ -47,6 +48,7 @@ export const queryKeys = {
   products: ['products'] as const,
   notaList: (params?: Record<string, unknown>) => ['nota', 'list', params ?? {}] as const,
   notaDetail: (notaId: number) => ['nota', 'detail', notaId] as const,
+  notaDateRange: ['nota', 'date-range'] as const,
   payments: (customerId: number, year: number, month: number) =>
     ['bill-payments', customerId, year, month] as const,
 }
@@ -157,6 +159,10 @@ export function useNotaListQuery(params?: {
   })
 }
 
+export function useNotaDateRangeQuery() {
+  return useQuery({ queryKey: queryKeys.notaDateRange, queryFn: getNotaDateRange })
+}
+
 export function useNotaDetailQuery(notaId: number | null) {
   return useQuery({
     queryKey: queryKeys.notaDetail(notaId ?? -1),
@@ -171,6 +177,7 @@ export function useCreateNotaMutation() {
     mutationFn: (input: NotaInput) => createNota(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nota', 'list'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notaDateRange })
     },
   })
 }
@@ -182,6 +189,7 @@ export function useVoidNotaMutation() {
     onSuccess: (_data, notaId) => {
       queryClient.invalidateQueries({ queryKey: ['nota', 'list'] })
       queryClient.invalidateQueries({ queryKey: queryKeys.notaDetail(notaId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notaDateRange })
       invalidateNotaPdfCache(notaId)
     },
   })

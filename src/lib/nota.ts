@@ -67,6 +67,19 @@ export async function listNota(params?: {
   return { nota: data.nota, total: data.total }
 }
 
+export interface NotaDateRange {
+  minYear: number | null
+  minMonth: number | null
+  maxYear: number | null
+  maxMonth: number | null
+}
+
+export async function getNotaDateRange(): Promise<NotaDateRange> {
+  const res = await apiFetch('/nota/date-range')
+  if (!res.ok) throw new Error('Failed to load nota date range')
+  return (await res.json()) as NotaDateRange
+}
+
 export interface NotaItemInput {
   sku_id: number | null
   sku_name: string
