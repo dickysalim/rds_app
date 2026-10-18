@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
@@ -35,24 +36,24 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CompanyOverviewView } from '@/components/CompanyOverviewView'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
-import { MonthlyNotaView } from '@/components/MonthlyNotaView'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
-import { getBusiness } from '@/lib/business'
 import { formatRupiah } from '@/lib/currency'
 import {
+  billPeriodOf,
   getNota,
   getPaymentEvidenceUrl,
-  listNota,
-  listPayments,
+  listBillPayments,
+  statusLabel,
   statusPillClass,
-  voidNota,
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
+import { queryKeys, useBusinessQuery, useNotaListQuery, useVoidNotaMutation } from '@/lib/queries'
 
 const PAGE_SIZE = 25
 
@@ -75,20 +76,21 @@ const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
 
 export function NotaPage() {
-  const [nota, setNota] = useState<NotaListItem[]>([])
-  const [total, setTotal] = useState(0)
+  const queryClient = useQueryClient()
+  const { data: business } = useBusinessQuery()
+  const voidMutation = useVoidNotaMutation()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [month, setMonth] = useState('all')
   const [year, setYear] = useState('all')
-  const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'list' | 'create'>('list')
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
-  const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
+  const [paymentDialogTarget, setPaymentDialogTarget] = useState<NotaListItem | null>(null)
+  const [paymentDialogDefaultAmount, setPaymentDialogDefaultAmount] = useState(0)
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
   const [paymentPdfUrl, setPaymentPdfUrl] = useState<string | null>(null)
   const [paymentPdfLoading, setPaymentPdfLoading] = useState(false)
@@ -104,59 +106,62 @@ export function NotaPage() {
     setPage(1)
   }, [debouncedSearch, status, month, year])
 
-  function refetch(targetPage: number) {
-    setLoading(true)
-    listNota({
-      limit: PAGE_SIZE,
-      offset: (targetPage - 1) * PAGE_SIZE,
-      q: debouncedSearch || undefined,
-      status: status !== 'all' ? status : undefined,
-      month: month !== 'all' ? month : undefined,
-      year: year !== 'all' ? year : undefined,
-    })
-      .then(({ nota: rows, total: rowTotal }) => {
-        setNota(rows)
-        setTotal(rowTotal)
-      })
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    refetch(page)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, status, month, year])
+  const { data: notaPage, isLoading: loading } = useNotaListQuery({
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+    q: debouncedSearch || undefined,
+    status: status !== 'all' ? status : undefined,
+    month: month !== 'all' ? month : undefined,
+    year: year !== 'all' ? year : undefined,
+  })
+  const nota = notaPage?.nota ?? []
+  const total = notaPage?.total ?? 0
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  function handleSaved(created: NotaListItem) {
+  function handleSaved(created: { nota_id: number }) {
     setView('list')
     setSelectedNotaId(created.nota_id)
     setPage(1)
-    refetch(1)
   }
 
-  function toggleExpand(notaId: number) {
-    const next = expandedNotaId === notaId ? null : notaId
+  function toggleExpandNota(n: NotaListItem) {
+    const next = expandedNotaId === n.nota_id ? null : n.nota_id
     setExpandedNotaId(next)
     if (next !== null && !paymentsByNota[next]) {
-      listPayments(next)
+      const { year, month } = billPeriodOf(n)
+      queryClient
+        .fetchQuery({
+          queryKey: queryKeys.payments(n.customer_id, year, month),
+          queryFn: () => listBillPayments(n.customer_id, year, month),
+        })
         .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [next]: payments })))
         .catch(() => {})
     }
   }
 
-  function handlePaymentCreated(notaId: number) {
-    listPayments(notaId)
-      .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
+  function handlePaymentCreated(n: NotaListItem) {
+    queryClient.invalidateQueries({ queryKey: ['nota'] })
+    const { year, month } = billPeriodOf(n)
+    const queryKey = queryKeys.payments(n.customer_id, year, month)
+    queryClient.invalidateQueries({ queryKey })
+    queryClient
+      .fetchQuery({
+        queryKey,
+        queryFn: () => listBillPayments(n.customer_id, year, month),
+      })
+      .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [n.nota_id]: payments })))
       .catch(() => {})
-    refetch(page)
   }
 
   async function handleDownloadPdf(notaId: number) {
     try {
-      const [nota, business] = await Promise.all([getNota(notaId), getBusiness()])
+      const notaDetail = await queryClient.fetchQuery({
+        queryKey: queryKeys.notaDetail(notaId),
+        queryFn: () => getNota(notaId),
+      })
       if (!business) throw new Error('Set up Business Settings first')
-      await downloadNotaPdf(nota, business)
+      await downloadNotaPdf(notaDetail, business)
     } catch {
       // ignore; user can retry from the menu
     }
@@ -171,14 +176,13 @@ export function NotaPage() {
     setPaymentPdfError(null)
   }
 
-  async function handleSeePaymentPdf(notaId: number, payment: Payment) {
+  async function handleSeePaymentPdf(n: NotaListItem, payment: Payment) {
     setPaymentPdfLoading(true)
     setPaymentPdfError(null)
     setPaymentPdfUrl(null)
     try {
-      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
       if (!business) throw new Error('Set up Business Settings first')
-      const url = await previewPaymentPdfUrl(notaDetail, payment, business)
+      const url = await previewPaymentPdfUrl(n, payment, business)
       if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
       paymentPdfBlobRef.current = url
       setPaymentPdfUrl(url)
@@ -194,8 +198,7 @@ export function NotaPage() {
     const notaId = deleteNotaId
     setDeleteNotaId(null)
     try {
-      await voidNota(notaId)
-      refetch(page)
+      await voidMutation.mutateAsync(notaId)
     } catch {
       // ignore; nota stays in list
     }
@@ -205,19 +208,22 @@ export function NotaPage() {
     return <NotaCreatePanel onCancel={() => setView('list')} onSaved={handleSaved} />
   }
 
-  if (selectedNotaId !== null) {
-    return <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
-  }
-
   return (
     <div className="space-y-4">
+      {selectedNotaId !== null && (
+        <NotaDetailPanel notaId={selectedNotaId} onBack={() => setSelectedNotaId(null)} />
+      )}
       <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
 
-      <Tabs defaultValue="nota">
+      <Tabs defaultValue="overview">
         <TabsList>
+          <TabsTrigger value="overview">Monthly Overview</TabsTrigger>
           <TabsTrigger value="nota">Nota View</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly View</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview">
+          <CompanyOverviewView onAddNota={() => setView('create')} onSelectNota={setSelectedNotaId} />
+        </TabsContent>
 
         <TabsContent value="nota" className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -235,7 +241,7 @@ export function NotaPage() {
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="unpaid">Unpaid</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="partial">Partially Paid</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
             </SelectContent>
           </Select>
@@ -287,14 +293,11 @@ export function NotaPage() {
       <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-8" />
             <TableHead>Nota Number</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead className="text-right">Total Bill</TableHead>
-            <TableHead className="text-right">Unpaid</TableHead>
-            <TableHead className="text-right">Paid</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="w-8" />
           </TableRow>
@@ -302,13 +305,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -322,33 +325,13 @@ export function NotaPage() {
                     className="cursor-pointer hover:bg-accent/50"
                     onClick={() => setSelectedNotaId(n.nota_id)}
                   >
-                    <TableCell>
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleExpand(n.nota_id)
-                        }}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </button>
-                    </TableCell>
                     <TableCell>{n.nota_number}</TableCell>
                     <TableCell>{n.nota_date}</TableCell>
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
                     <TableCell>{n.contact_name_snapshot}</TableCell>
                     <TableCell className="text-right">{formatRupiah(n.total_price)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatRupiah(n.total_price - n.paid_amount)}
-                    </TableCell>
-                    <TableCell className="text-right">{formatRupiah(n.paid_amount)}</TableCell>
                     <TableCell>
-                      <span className={`capitalize ${statusPillClass(n.status)}`}>{n.status}</span>
+                      <span className={statusPillClass(n.status)}>{statusLabel(n.status)}</span>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
@@ -361,8 +344,16 @@ export function NotaPage() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setPaymentDialogNotaId(n.nota_id)}>
-                            Make Payment
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setPaymentDialogTarget(n)
+                              setPaymentDialogDefaultAmount(n.total_price - n.paid_amount)
+                            }}
+                          >
+                            Add Payment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleExpandNota(n)}>
+                            See Payment
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDownloadPdf(n.nota_id)}>
                             Download PDF
@@ -380,7 +371,7 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-muted/30 pl-14">
+                      <TableCell colSpan={10} className="bg-white pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (
@@ -421,7 +412,7 @@ export function NotaPage() {
                                   <TableCell>
                                     {p.evidence_key ? (
                                       <a
-                                        href={getPaymentEvidenceUrl(n.nota_id, p.payment_id)}
+                                        href={getPaymentEvidenceUrl(p.payment_id)}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-primary underline"
@@ -442,7 +433,7 @@ export function NotaPage() {
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 px-2"
-                                      onClick={() => handleSeePaymentPdf(n.nota_id, p)}
+                                      onClick={() => handleSeePaymentPdf(n, p)}
                                     >
                                       <Download className="h-3.5 w-3.5" />
                                       Download PDF
@@ -494,18 +485,17 @@ export function NotaPage() {
         </div>
       </div>
         </TabsContent>
-
-        <TabsContent value="monthly">
-          <MonthlyNotaView onAddNota={() => setView('create')} onSelectNota={setSelectedNotaId} />
-        </TabsContent>
       </Tabs>
 
-      {paymentDialogNotaId !== null && (
+      {paymentDialogTarget !== null && (
         <MakePaymentDialog
-          notaId={paymentDialogNotaId}
+          customerId={paymentDialogTarget.customer_id}
+          year={billPeriodOf(paymentDialogTarget).year}
+          month={billPeriodOf(paymentDialogTarget).month}
+          defaultAmount={paymentDialogDefaultAmount}
           open
-          onClose={() => setPaymentDialogNotaId(null)}
-          onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
+          onClose={() => setPaymentDialogTarget(null)}
+          onCreated={() => handlePaymentCreated(paymentDialogTarget)}
         />
       )}
 

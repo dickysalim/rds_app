@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,40 +28,25 @@ import {
 } from '@/components/ui/table'
 import { ProductDialog } from '@/components/ProductDialog'
 import { formatRupiah } from '@/lib/currency'
-import { deleteProduct, listProducts, type Product } from '@/lib/products'
+import type { Product } from '@/lib/products'
+import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
 
 export function ProductPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: products = [], isLoading: loading } = useProductsQuery()
+  const deleteMutation = useDeleteProductMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    listProducts()
-      .then(setProducts)
-      .finally(() => setLoading(false))
-  }, [])
-
-  function handleSaved(product: Product) {
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.sku_id === product.sku_id)
-      return exists ? prev.map((p) => (p.sku_id === product.sku_id ? product : p)) : [...prev, product]
-    })
+  function handleSaved() {
+    // Mutations already invalidate the shared products query.
   }
 
   async function handleDelete() {
     if (!deletingProduct) return
-    setDeleting(true)
-    try {
-      await deleteProduct(deletingProduct.sku_id)
-      setProducts((prev) => prev.filter((p) => p.sku_id !== deletingProduct.sku_id))
-      setDeletingProduct(null)
-    } finally {
-      setDeleting(false)
-    }
+    await deleteMutation.mutateAsync(deletingProduct.sku_id)
+    setDeletingProduct(null)
   }
 
   const filteredProducts = products.filter((p) =>
@@ -169,8 +154,8 @@ export function ProductPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
+            <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

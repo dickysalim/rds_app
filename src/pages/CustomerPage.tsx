@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,42 +27,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { deleteCustomer, listCustomers, type Customer } from '@/lib/customers'
+import type { Customer } from '@/lib/customers'
+import { useCustomersQuery, useDeleteCustomerMutation } from '@/lib/queries'
 
 export function CustomerPage() {
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: customers = [], isLoading: loading } = useCustomersQuery()
+  const deleteMutation = useDeleteCustomerMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    listCustomers()
-      .then(setCustomers)
-      .finally(() => setLoading(false))
-  }, [])
-
-  function handleSaved(customer: Customer) {
-    setCustomers((prev) => {
-      const exists = prev.some((c) => c.customer_id === customer.customer_id)
-      return exists
-        ? prev.map((c) => (c.customer_id === customer.customer_id ? customer : c))
-        : [...prev, customer]
-    })
+  function handleSaved() {
+    // Mutations already invalidate the shared customers query.
   }
 
   async function handleDelete() {
     if (!deletingCustomer) return
-    setDeleting(true)
-    try {
-      await deleteCustomer(deletingCustomer.customer_id)
-      setCustomers((prev) => prev.filter((c) => c.customer_id !== deletingCustomer.customer_id))
-      setDeletingCustomer(null)
-    } finally {
-      setDeleting(false)
-    }
+    await deleteMutation.mutateAsync(deletingCustomer.customer_id)
+    setDeletingCustomer(null)
   }
 
   const filteredCustomers = customers.filter((c) => {
@@ -181,8 +164,8 @@ export function CustomerPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
+            <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

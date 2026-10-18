@@ -15,11 +15,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { listCustomers, updateCustomer, type Customer } from '@/lib/customers'
+import type { Customer } from '@/lib/customers'
 import { formatRupiah, formatRupiahInput } from '@/lib/currency'
 import { useNavGuard } from '@/lib/nav-guard'
-import { createNota, UNITS, type NotaInput, type NotaListItem } from '@/lib/nota'
-import { listProducts, type Product } from '@/lib/products'
+import { UNITS, type NotaInput, type NotaListItem } from '@/lib/nota'
+import type { Product } from '@/lib/products'
+import {
+  useCreateNotaMutation,
+  useCustomersQuery,
+  useProductsQuery,
+  useUpdateCustomerMutation,
+} from '@/lib/queries'
 
 function toNumber(formatted: string): number {
   return Number(formatted.replace(/\D/g, '')) || 0
@@ -60,8 +66,10 @@ export function NotaCreatePanel({
   onCancel: () => void
   onSaved: (nota: NotaListItem) => void
 }) {
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const { data: customers = [] } = useCustomersQuery()
+  const { data: products = [] } = useProductsQuery()
+  const createNotaMutation = useCreateNotaMutation()
+  const updateCustomerMutation = useUpdateCustomerMutation()
   const [notaDate, setNotaDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [companyName, setCompanyName] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
@@ -97,11 +105,6 @@ export function NotaCreatePanel({
   const [confirmSave, setConfirmSave] = useState(false)
   const [confirmUpdateCustomer, setConfirmUpdateCustomer] = useState(false)
   const [pendingNota, setPendingNota] = useState<NotaListItem | null>(null)
-
-  useEffect(() => {
-    listCustomers().then(setCustomers).catch(() => {})
-    listProducts().then(setProducts).catch(() => {})
-  }, [])
 
   useEffect(() => {
     setError(null)
@@ -197,7 +200,7 @@ export function NotaCreatePanel({
 
     setLoading(true)
     try {
-      const nota = await createNota(input)
+      const nota = await createNotaMutation.mutateAsync(input)
       const customerDataChanged =
         isExistingCustomer &&
         selectedCustomer !== null &&
@@ -222,11 +225,14 @@ export function NotaCreatePanel({
     setConfirmUpdateCustomer(false)
     if (shouldUpdate && selectedCustomer) {
       try {
-        await updateCustomer(selectedCustomer.customer_id, {
-          company_name: companyName,
-          address: companyAddress || null,
-          contact_name: contactPerson,
-          phone_number: phoneNumber,
+        await updateCustomerMutation.mutateAsync({
+          customerId: selectedCustomer.customer_id,
+          input: {
+            company_name: companyName,
+            address: companyAddress || null,
+            contact_name: contactPerson,
+            phone_number: phoneNumber,
+          },
         })
       } catch {
         // nota already saved; customer update failure is non-blocking
@@ -291,7 +297,15 @@ export function NotaCreatePanel({
               id="company_name"
               value={companyName}
               onChange={(e) => {
-                setCompanyName(e.target.value)
+                const typed = e.target.value
+                const exact = customers.find(
+                  (c) => c.company_name.trim().toLowerCase() === typed.trim().toLowerCase(),
+                )
+                if (exact) {
+                  handlePickCompany(exact)
+                  return
+                }
+                setCompanyName(typed)
                 setIsExistingCustomer(false)
                 setShowCustomerSuggestions(true)
                 setCompanyHighlightedIndex(-1)
@@ -346,7 +360,8 @@ export function NotaCreatePanel({
             id="contact_person"
             value={contactPerson}
             onChange={(e) => setContactPerson(e.target.value)}
-            tabIndex={isExistingCustomer ? -1 : undefined}
+            disabled={isExistingCustomer}
+            className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
             required
           />
           <Label htmlFor="company_address" className="self-start pt-2 text-right">
@@ -354,10 +369,10 @@ export function NotaCreatePanel({
           </Label>
           <Textarea
             id="company_address"
-            className="row-span-2 min-h-[4.5rem]"
+            className="row-span-2 min-h-[4.5rem] disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
             value={companyAddress}
             onChange={(e) => setCompanyAddress(e.target.value)}
-            tabIndex={isExistingCustomer ? -1 : undefined}
+            disabled={isExistingCustomer}
           />
 
           <Label htmlFor="phone_number" className="text-right">
@@ -367,7 +382,8 @@ export function NotaCreatePanel({
             id="phone_number"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
-            tabIndex={isExistingCustomer ? -1 : undefined}
+            disabled={isExistingCustomer}
+            className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
             required
           />
         </div>
@@ -376,7 +392,7 @@ export function NotaCreatePanel({
           <Label className="font-bold">Nota Item</Label>
 
           <div className="rounded-md border">
-          <div className="hidden gap-2 border-b bg-muted px-3 py-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
+          <div className="hidden gap-2 border-b bg-white px-3 py-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
             <span>SKU name</span>
             <span>Unit</span>
             <span>Qty</span>
@@ -392,7 +408,7 @@ export function NotaCreatePanel({
               )
               const lockedBySku = row.skuId !== null
               const cellInputClass =
-                'min-w-0 rounded-none border-0 border-b bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-b-ring'
+                'min-w-0 rounded-none border-0 border-b bg-white shadow-none focus-visible:ring-0 focus-visible:border-b-ring'
               return (
               <div
                 key={row.key}
@@ -465,15 +481,18 @@ export function NotaCreatePanel({
                 <Select
                   value={row.unit}
                   onValueChange={(value) => updateItem(row.key, { unit: value })}
+                  disabled={lockedBySku}
                 >
                   <SelectTrigger
-                    className={`${cellInputClass} w-full`}
-                    tabIndex={lockedBySku ? -1 : undefined}
+                    className={`${cellInputClass} w-full disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100`}
                   >
                     <SelectValue placeholder="Unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    {UNITS.map((u) => (
+                    {(row.unit && !(UNITS as readonly string[]).includes(row.unit)
+                      ? [...UNITS, row.unit]
+                      : UNITS
+                    ).map((u) => (
                       <SelectItem key={u} value={u}>
                         {u}
                       </SelectItem>

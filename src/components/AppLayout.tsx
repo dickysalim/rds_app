@@ -15,8 +15,8 @@ export function AppLayout({
     <NavGuardProvider>
       <SidebarProvider>
         <AppSidebar user={user} onLogout={onLogout} />
-        <div className="flex min-h-svh w-full flex-col">
-          <main className="flex-1 p-6">
+        <div className="flex min-h-svh w-full min-w-0 flex-col">
+          <main className="min-w-0 flex-1 p-6">
             <Outlet />
           </main>
         </div>

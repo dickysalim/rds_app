@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Download, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
@@ -35,20 +36,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
-import { getBusiness } from '@/lib/business'
 import { formatRupiah } from '@/lib/currency'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import {
+  billPeriodOf,
   getNota,
   getPaymentEvidenceUrl,
-  listNota,
-  listPayments,
+  listBillPayments,
   statusPillClass,
-  voidNota,
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
 import { previewPaymentPdfUrl } from '@/lib/paymentPdf'
+import { queryKeys, useBusinessQuery, useNotaListQuery, useVoidNotaMutation } from '@/lib/queries'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
@@ -195,8 +195,9 @@ export function MonthlyNotaView({
   onAddNota: () => void
   onSelectNota: (notaId: number) => void
 }) {
-  const [nota, setNota] = useState<NotaListItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: business } = useBusinessQuery()
+  const voidMutation = useVoidNotaMutation()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -206,7 +207,8 @@ export function MonthlyNotaView({
   const [openCompany, setOpenCompany] = useState<string | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
-  const [paymentDialogNotaId, setPaymentDialogNotaId] = useState<number | null>(null)
+  const [paymentDialogTarget, setPaymentDialogTarget] = useState<NotaListItem | null>(null)
+  const [paymentDialogDefaultAmount, setPaymentDialogDefaultAmount] = useState(0)
   const [deleteNotaId, setDeleteNotaId] = useState<number | null>(null)
   const [paymentPdfUrl, setPaymentPdfUrl] = useState<string | null>(null)
   const [paymentPdfLoading, setPaymentPdfLoading] = useState(false)
@@ -218,21 +220,12 @@ export function MonthlyNotaView({
     return () => clearTimeout(t)
   }, [search])
 
-  function refetch() {
-    setLoading(true)
-    listNota({
-      q: debouncedSearch || undefined,
-      status: status !== 'all' ? status : undefined,
-      year: year !== 'all' ? year : undefined,
-    })
-      .then(({ nota: rows }) => setNota(rows))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    refetch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, status, year])
+  const { data: notaPage, isLoading: loading } = useNotaListQuery({
+    q: debouncedSearch || undefined,
+    status: status !== 'all' ? status : undefined,
+    year: year !== 'all' ? year : undefined,
+  })
+  const nota = notaPage?.nota ?? []
 
   const months = groupByMonth(nota)
 
@@ -254,26 +247,41 @@ export function MonthlyNotaView({
     setExpandedNotaId(null)
   }
 
-  function toggleExpandNota(notaId: number) {
-    const next = expandedNotaId === notaId ? null : notaId
+  function toggleExpandNota(n: NotaListItem) {
+    const next = expandedNotaId === n.nota_id ? null : n.nota_id
     setExpandedNotaId(next)
     if (next !== null && !paymentsByNota[next]) {
-      listPayments(next)
+      const { year, month } = billPeriodOf(n)
+      queryClient
+        .fetchQuery({
+          queryKey: queryKeys.payments(n.customer_id, year, month),
+          queryFn: () => listBillPayments(n.customer_id, year, month),
+        })
         .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [next]: payments })))
         .catch(() => {})
     }
   }
 
-  function handlePaymentCreated(notaId: number) {
-    listPayments(notaId)
-      .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [notaId]: payments })))
+  function handlePaymentCreated(n: NotaListItem) {
+    queryClient.invalidateQueries({ queryKey: ['nota'] })
+    const { year, month } = billPeriodOf(n)
+    const queryKey = queryKeys.payments(n.customer_id, year, month)
+    queryClient.invalidateQueries({ queryKey })
+    queryClient
+      .fetchQuery({
+        queryKey,
+        queryFn: () => listBillPayments(n.customer_id, year, month),
+      })
+      .then((payments) => setPaymentsByNota((prev) => ({ ...prev, [n.nota_id]: payments })))
       .catch(() => {})
-    refetch()
   }
 
   async function handleDownloadPdf(notaId: number) {
     try {
-      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
+      const notaDetail = await queryClient.fetchQuery({
+        queryKey: queryKeys.notaDetail(notaId),
+        queryFn: () => getNota(notaId),
+      })
       if (!business) throw new Error('Set up Business Settings first')
       await downloadNotaPdf(notaDetail, business)
     } catch {
@@ -286,8 +294,7 @@ export function MonthlyNotaView({
     const notaId = deleteNotaId
     setDeleteNotaId(null)
     try {
-      await voidNota(notaId)
-      refetch()
+      await voidMutation.mutateAsync(notaId)
     } catch {
       // ignore; nota stays in list
     }
@@ -302,14 +309,13 @@ export function MonthlyNotaView({
     setPaymentPdfError(null)
   }
 
-  async function handleSeePaymentPdf(notaId: number, payment: Payment) {
+  async function handleSeePaymentPdf(n: NotaListItem, payment: Payment) {
     setPaymentPdfLoading(true)
     setPaymentPdfError(null)
     setPaymentPdfUrl(null)
     try {
-      const [notaDetail, business] = await Promise.all([getNota(notaId), getBusiness()])
       if (!business) throw new Error('Set up Business Settings first')
-      const url = await previewPaymentPdfUrl(notaDetail, payment, business)
+      const url = await previewPaymentPdfUrl(n, payment, business)
       if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
       paymentPdfBlobRef.current = url
       setPaymentPdfUrl(url)
@@ -594,9 +600,14 @@ export function MonthlyNotaView({
                                                   </DropdownMenuTrigger>
                                                   <DropdownMenuContent align="end">
                                                     <DropdownMenuItem
-                                                      onClick={() => setPaymentDialogNotaId(n.nota_id)}
+                                                      onClick={() => {
+                                                        setPaymentDialogTarget(n)
+                                                        setPaymentDialogDefaultAmount(
+                                                          n.total_price - n.paid_amount,
+                                                        )
+                                                      }}
                                                     >
-                                                      Make Payment
+                                                      Add Payment
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                       onClick={() => handleDownloadPdf(n.nota_id)}
@@ -615,7 +626,7 @@ export function MonthlyNotaView({
                                                   type="button"
                                                   className={`text-xs text-primary underline ${canSeePayment ? '' : 'invisible pointer-events-none'}`}
                                                   tabIndex={canSeePayment ? undefined : -1}
-                                                  onClick={() => toggleExpandNota(n.nota_id)}
+                                                  onClick={() => toggleExpandNota(n)}
                                                 >
                                                   See Payment
                                                 </button>
@@ -697,10 +708,7 @@ export function MonthlyNotaView({
                                                         <TableCell>
                                                           {p.evidence_key ? (
                                                             <a
-                                                              href={getPaymentEvidenceUrl(
-                                                                n.nota_id,
-                                                                p.payment_id,
-                                                              )}
+                                                              href={getPaymentEvidenceUrl(p.payment_id)}
                                                               target="_blank"
                                                               rel="noreferrer"
                                                               className="text-primary underline"
@@ -722,7 +730,7 @@ export function MonthlyNotaView({
                                                             size="sm"
                                                             className="h-6 px-2"
                                                             onClick={() =>
-                                                              handleSeePaymentPdf(n.nota_id, p)
+                                                              handleSeePaymentPdf(n, p)
                                                             }
                                                           >
                                                             <Download className="h-3.5 w-3.5" />
@@ -761,12 +769,15 @@ export function MonthlyNotaView({
         </div>
       )}
 
-      {paymentDialogNotaId !== null && (
+      {paymentDialogTarget !== null && (
         <MakePaymentDialog
-          notaId={paymentDialogNotaId}
+          customerId={paymentDialogTarget.customer_id}
+          year={billPeriodOf(paymentDialogTarget).year}
+          month={billPeriodOf(paymentDialogTarget).month}
+          defaultAmount={paymentDialogDefaultAmount}
           open
-          onClose={() => setPaymentDialogNotaId(null)}
-          onCreated={() => handlePaymentCreated(paymentDialogNotaId)}
+          onClose={() => setPaymentDialogTarget(null)}
+          onCreated={() => handlePaymentCreated(paymentDialogTarget)}
         />
       )}
 

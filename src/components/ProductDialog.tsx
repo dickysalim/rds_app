@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatRupiahInput } from '@/lib/currency'
-import { createProduct, updateProduct, type Product } from '@/lib/products'
+import type { Product } from '@/lib/products'
+import { useCreateProductMutation, useUpdateProductMutation } from '@/lib/queries'
 
-const UNIT_OPTIONS = ['pcs', 'box', 'lusin', 'kodi', 'rim', 'pack', 'kg', 'gram', 'liter', 'meter', 'roll', 'set']
+const UNIT_OPTIONS = ['pcs', 'box', 'lusin', 'kodi', 'rim', 'pack', 'kg', 'gram', 'liter', 'meter', 'roll', 'set', 'lembar', 'batang', 'kaleng', 'drum']
 
 export function ProductDialog({
   open,
@@ -37,7 +38,9 @@ export function ProductDialog({
   const [unit, setUnit] = useState('')
   const [suggestedPrice, setSuggestedPrice] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const createMutation = useCreateProductMutation()
+  const updateMutation = useUpdateProductMutation()
+  const loading = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
     if (open) {
@@ -53,20 +56,19 @@ export function ProductDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setLoading(true)
     try {
       const input = {
         sku_name: skuName,
         unit,
         suggested_price: suggestedPrice ? Number(suggestedPrice.replace(/\D/g, '')) : null,
       }
-      const saved = product ? await updateProduct(product.sku_id, input) : await createProduct(input)
+      const saved = product
+        ? await updateMutation.mutateAsync({ skuId: product.sku_id, input })
+        : await createMutation.mutateAsync(input)
       onSaved(saved)
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save product')
-    } finally {
-      setLoading(false)
     }
   }
 

@@ -1,15 +1,15 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { apiFetch } from '@/lib/api'
 import type { Business } from '@/lib/business'
-import { getBusinessLogoUrl } from '@/lib/business'
+import { loadGrayscaleLogoDataUrl } from '@/lib/logoCache'
 import type { NotaDetail } from '@/lib/nota'
 
-const PAGE_WIDTH = 210
-const PAGE_HEIGHT = 297
+// Epson LX-310 continuous tractor-feed paper: 9.5" wide (241.3mm), no fixed
+// page length — the page grows to fit however many items the nota has.
+const PAGE_WIDTH = 241.3
 const MARGIN = 16
 const CONTENT_RIGHT = PAGE_WIDTH - MARGIN
-const FOOTER_Y = 255
-const FOOTER_RESERVE = PAGE_HEIGHT - FOOTER_Y + 8
 
 function fmt(amount: number): string {
   return new Intl.NumberFormat('id-ID').format(Math.round(amount))
@@ -23,22 +23,6 @@ function formatDateLong(iso: string): string {
     month: 'long',
     year: 'numeric',
   })
-}
-
-async function loadLogoDataUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(getBusinessLogoUrl())
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
 }
 
 const LOGO_SIZE = 28
@@ -85,53 +69,55 @@ function drawLetterhead(doc: jsPDF, business: Business, nota: NotaDetail, logo: 
   doc.setLineWidth(0.4)
   doc.line(MARGIN, headerBottom, CONTENT_RIGHT, headerBottom)
 
-  let sy = headerBottom + 7
-  const colonX = MARGIN + 32
-  const valueX = colonX + 4
+  const topY = headerBottom + 7
   doc.setFontSize(10)
-  doc.setFont('helvetica', 'bold')
-  doc.text('No. Nota', MARGIN, sy)
-  doc.text(':', colonX, sy)
-  doc.setFont('helvetica', 'normal')
-  doc.text(nota.nota_number, valueX, sy)
-  sy += 6
-  doc.setFont('helvetica', 'bold')
-  doc.text('Tanggal Nota', MARGIN, sy)
-  doc.text(':', colonX, sy)
-  doc.setFont('helvetica', 'normal')
-  doc.text(formatDateLong(nota.nota_date), valueX, sy)
-  sy += 12
 
+  // Right column: nota number + date, right-aligned.
+  const metaLabelX = CONTENT_RIGHT - 75
+  const metaColonX = metaLabelX + 28
+  let ry = topY
+  doc.setFont('helvetica', 'bold')
+  doc.text('No. Nota', metaLabelX, ry)
+  doc.text(':', metaColonX, ry)
+  doc.setFont('helvetica', 'normal')
+  doc.text(nota.nota_number, CONTENT_RIGHT, ry, { align: 'right' })
+  ry += 6
+  doc.setFont('helvetica', 'bold')
+  doc.text('Tanggal Nota', metaLabelX, ry)
+  doc.text(':', metaColonX, ry)
+  doc.setFont('helvetica', 'normal')
+  doc.text(formatDateLong(nota.nota_date), CONTENT_RIGHT, ry, { align: 'right' })
+
+  // Left column: customer, on the same rows as the meta block.
+  const customerMaxWidth = metaLabelX - MARGIN - 6
+  let sy = topY
   doc.setFont('helvetica', 'bold')
   doc.text('Kepada Yth.', MARGIN, sy)
   sy += 5.5
   doc.setFont('helvetica', 'normal')
-  doc.text(nota.customer_company_name_snapshot, MARGIN, sy)
+  doc.text(nota.customer_company_name_snapshot, MARGIN, sy, { maxWidth: customerMaxWidth })
   sy += 5.5
   if (nota.contact_name_snapshot) {
-    doc.text(nota.contact_name_snapshot, MARGIN, sy)
+    doc.text(nota.contact_name_snapshot, MARGIN, sy, { maxWidth: customerMaxWidth })
     sy += 5.5
   }
   if (nota.customer_address_snapshot) {
-    doc.text(nota.customer_address_snapshot, MARGIN, sy, { maxWidth: CONTENT_RIGHT - MARGIN })
+    doc.text(nota.customer_address_snapshot, MARGIN, sy, { maxWidth: customerMaxWidth })
     sy += 5.5
   }
 
-  const sectionBottom = sy + 2
+  const sectionBottom = Math.max(sy, ry + 5.5) + 2
   doc.line(MARGIN, sectionBottom, CONTENT_RIGHT, sectionBottom)
 
   return sectionBottom + 2
 }
 
-export async function buildNotaPdf(nota: NotaDetail, business: Business): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const logo = business.business_logo_key ? await loadLogoDataUrl() : null
-
+function renderNota(doc: jsPDF, nota: NotaDetail, business: Business, logo: string | null): number {
   const tableStartY = drawLetterhead(doc, business, nota, logo)
 
   autoTable(doc, {
     startY: tableStartY,
-    margin: { left: MARGIN, right: MARGIN, bottom: FOOTER_RESERVE },
+    margin: { left: MARGIN, right: MARGIN },
     head: [['No.', 'Nama Item', 'Qty', 'Unit', 'Harga', 'Total']],
     body: nota.items.map((item, idx) => [
       String(idx + 1),
@@ -141,7 +127,7 @@ export async function buildNotaPdf(nota: NotaDetail, business: Business): Promis
       fmt(item.price),
       fmt(item.total_price),
     ]),
-    styles: { font: 'helvetica', fontSize: 11, cellPadding: 2.5 },
+    styles: { font: 'helvetica', fontSize: 11, cellPadding: 2, overflow: 'linebreak' },
     headStyles: {
       fillColor: false,
       textColor: 0,
@@ -149,32 +135,21 @@ export async function buildNotaPdf(nota: NotaDetail, business: Business): Promis
       lineWidth: { bottom: 0.4 },
       lineColor: 0,
       valign: 'middle',
-      cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+      cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
     },
     bodyStyles: { lineWidth: 0 },
     alternateRowStyles: { fillColor: false },
     columnStyles: {
-      0: { cellWidth: 11 },
+      0: { cellWidth: 10 },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 18, halign: 'right' },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 32, halign: 'right' },
-      5: { cellWidth: 32, halign: 'right' },
+      2: { cellWidth: 16, halign: 'right' },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 30, halign: 'right' },
+      5: { cellWidth: 30, halign: 'right' },
     },
     didParseCell: (data) => {
       if (data.section === 'head' && [2, 4, 5].includes(data.column.index)) {
         data.cell.styles.halign = 'right'
-      }
-    },
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) {
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.text(business.business_name, MARGIN, 16)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.text(`No. Nota  ${nota.nota_number} (lanjutan)`, MARGIN, 22)
-        data.settings.margin.top = 28
       }
     },
   })
@@ -185,11 +160,6 @@ export async function buildNotaPdf(nota: NotaDetail, business: Business): Promis
   doc.line(MARGIN, finalY, CONTENT_RIGHT, finalY)
   finalY += 7
 
-  if (finalY > FOOTER_Y - 10) {
-    doc.addPage()
-    finalY = 20
-  }
-
   const labelX = 140
   const valueX = CONTENT_RIGHT
   doc.setFont('helvetica', 'bold')
@@ -197,38 +167,96 @@ export async function buildNotaPdf(nota: NotaDetail, business: Business): Promis
   doc.text('TOTAL', labelX, finalY)
   doc.text(fmt(nota.total_price), valueX, finalY, { align: 'right' })
 
-  if (business.payment_bank_name || business.payment_account_number) {
-    let payY = FOOTER_Y
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Pembayaran via Transfer', CONTENT_RIGHT, payY, { align: 'right' })
-    payY += 7
-    doc.setFont('helvetica', 'normal')
-    if (business.payment_bank_name || business.payment_account_name) {
-      doc.text(
-        `${business.payment_bank_name ?? ''} a.n ${business.payment_account_name ?? ''}`.trim(),
-        CONTENT_RIGHT,
-        payY,
-        { align: 'right' },
-      )
-      payY += 7
-    }
-    if (business.payment_account_number) {
-      doc.text(`No. Rek : ${business.payment_account_number}`, CONTENT_RIGHT, payY, {
-        align: 'right',
-      })
-    }
-  }
+  return finalY
+}
+
+export async function buildNotaPdf(nota: NotaDetail, business: Business): Promise<jsPDF> {
+  const logo = business.business_logo_key ? await loadGrayscaleLogoDataUrl() : null
+
+  // jsPDF flips y-coordinates using the page height at draw time, so the
+  // final page height must be known before drawing. Measure on a generously
+  // tall scratch page first, then redraw on a page sized to fit exactly.
+  const scratch = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, 2000] })
+  const measuredFinalY = renderNota(scratch, nota, business, logo)
+
+  // jsPDF's default "portrait" orientation silently swaps width/height
+  // whenever width > height — which happens for short nota, since the
+  // paper is 241.3mm wide. Pick the orientation that matches our actual
+  // dimensions so it's a no-op instead of scrambling the page.
+  const finalHeight = measuredFinalY + 14
+  const orientation = finalHeight >= PAGE_WIDTH ? 'p' : 'l'
+  const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, finalHeight], orientation })
+  renderNota(doc, nota, business, logo)
 
   return doc
 }
 
-export async function downloadNotaPdf(nota: NotaDetail, business: Business): Promise<void> {
+// Nota are immutable once created (only void changes them), so the rendered
+// PDF never needs to change. Cache it twice: in-memory for this session (no
+// network at all on repeat preview/download), and server-side in R2 (no
+// regeneration cost on the next session or device) via GET/PUT /nota/:id/pdf.
+const pdfBlobCache = new Map<number, Blob>()
+
+async function fetchServerCachedPdf(notaId: number): Promise<Blob | null> {
+  try {
+    const res = await apiFetch(`/nota/${notaId}/pdf`)
+    if (!res.ok) return null
+    return await res.blob()
+  } catch {
+    return null
+  }
+}
+
+function uploadPdfToServerCache(notaId: number, blob: Blob): void {
+  apiFetch(`/nota/${notaId}/pdf`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: blob,
+  }).catch(() => {})
+}
+
+export function invalidateNotaPdfCache(notaId: number): void {
+  pdfBlobCache.delete(notaId)
+}
+
+// Call after anything that changes the PDF letterhead (logo, business
+// details) — every nota cached client- or server-side has the old one baked
+// in. Clears this tab's in-memory cache and tells the server to drop its R2
+// pointers too (the next preview/download regenerates and re-uploads).
+export function clearAllNotaPdfCaches(): void {
+  pdfBlobCache.clear()
+  apiFetch('/nota/pdf-cache', { method: 'DELETE' }).catch(() => {})
+}
+
+async function getNotaPdfBlob(nota: NotaDetail, business: Business): Promise<Blob> {
+  const cached = pdfBlobCache.get(nota.nota_id)
+  if (cached) return cached
+
+  // Mock/dev-only nota (negative ids) never hit the server cache.
+  const serverCached = nota.nota_id > 0 ? await fetchServerCachedPdf(nota.nota_id) : null
+  if (serverCached) {
+    pdfBlobCache.set(nota.nota_id, serverCached)
+    return serverCached
+  }
+
   const doc = await buildNotaPdf(nota, business)
-  doc.save(`${nota.nota_number.replace(/\//g, '-')}.pdf`)
+  const blob = doc.output('blob') as Blob
+  pdfBlobCache.set(nota.nota_id, blob)
+  if (nota.nota_id > 0) uploadPdfToServerCache(nota.nota_id, blob)
+  return blob
+}
+
+export async function downloadNotaPdf(nota: NotaDetail, business: Business): Promise<void> {
+  const blob = await getNotaPdfBlob(nota, business)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${nota.nota_number.replace(/\//g, '-')}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export async function previewNotaPdfUrl(nota: NotaDetail, business: Business): Promise<string> {
-  const doc = await buildNotaPdf(nota, business)
-  return doc.output('bloburl') as unknown as string
+  const blob = await getNotaPdfBlob(nota, business)
+  return URL.createObjectURL(blob)
 }

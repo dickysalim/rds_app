@@ -3,16 +3,18 @@ import Cropper, { type Area } from 'react-easy-crop'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  getBusiness,
-  getBusinessLogoUrl,
-  updateBusiness,
-  uploadBusinessLogo,
-  type Business,
-} from '@/lib/business'
+import { getBusinessLogoUrl } from '@/lib/business'
 import { getCroppedImageBlob } from '@/lib/cropImage'
+import {
+  useBusinessQuery,
+  useUpdateBusinessMutation,
+  useUploadBusinessLogoMutation,
+} from '@/lib/queries'
 
 export function BusinessSettingsPage() {
+  const { data: business, isLoading: loading } = useBusinessQuery()
+  const updateMutation = useUpdateBusinessMutation()
+  const uploadLogoMutation = useUploadBusinessLogoMutation()
   const [businessName, setBusinessName] = useState('')
   const [businessAddress, setBusinessAddress] = useState('')
   const [businessContactPerson, setBusinessContactPerson] = useState('')
@@ -23,8 +25,6 @@ export function BusinessSettingsPage() {
   const [paymentAccountNumber, setPaymentAccountNumber] = useState('')
   const [hasLogo, setHasLogo] = useState(false)
   const [logoVersion, setLogoVersion] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -32,25 +32,20 @@ export function BusinessSettingsPage() {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedArea, setCroppedArea] = useState<Area | null>(null)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    getBusiness()
-      .then((business: Business | null) => {
-        if (!business) return
-        setBusinessName(business.business_name)
-        setBusinessAddress(business.business_address ?? '')
-        setBusinessContactPerson(business.business_contact_person ?? '')
-        setBusinessContactNumber(business.business_contact_number ?? '')
-        setBusinessEmail(business.business_email ?? '')
-        setPaymentBankName(business.payment_bank_name ?? '')
-        setPaymentAccountName(business.payment_account_name ?? '')
-        setPaymentAccountNumber(business.payment_account_number ?? '')
-        setHasLogo(!!business.business_logo_key)
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    if (!business) return
+    setBusinessName(business.business_name)
+    setBusinessAddress(business.business_address ?? '')
+    setBusinessContactPerson(business.business_contact_person ?? '')
+    setBusinessContactNumber(business.business_contact_number ?? '')
+    setBusinessEmail(business.business_email ?? '')
+    setPaymentBankName(business.payment_bank_name ?? '')
+    setPaymentAccountName(business.payment_account_name ?? '')
+    setPaymentAccountNumber(business.payment_account_number ?? '')
+    setHasLogo(!!business.business_logo_key)
+  }, [business])
 
   function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -68,18 +63,15 @@ export function BusinessSettingsPage() {
 
   async function handleSaveCroppedLogo() {
     if (!cropSrc || !croppedArea) return
-    setUploadingLogo(true)
     setError(null)
     try {
       const blob = await getCroppedImageBlob(cropSrc, croppedArea)
-      await uploadBusinessLogo(blob)
+      await uploadLogoMutation.mutateAsync(blob)
       setHasLogo(true)
       setLogoVersion((v) => v + 1)
       setCropSrc(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload logo')
-    } finally {
-      setUploadingLogo(false)
     }
   }
 
@@ -87,9 +79,8 @@ export function BusinessSettingsPage() {
     e.preventDefault()
     setError(null)
     setSaved(false)
-    setSaving(true)
     try {
-      await updateBusiness({
+      await updateMutation.mutateAsync({
         business_name: businessName,
         business_address: businessAddress || null,
         business_contact_person: businessContactPerson || null,
@@ -102,8 +93,6 @@ export function BusinessSettingsPage() {
       setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save business settings')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -141,7 +130,7 @@ export function BusinessSettingsPage() {
 
       {cropSrc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md space-y-3 rounded-md border bg-background p-4 shadow-lg">
+          <div className="w-full max-w-md space-y-3 rounded-md border bg-white p-4 shadow-lg">
             <h2 className="font-semibold">Crop logo</h2>
             <p className="text-sm text-muted-foreground">
               Drag to reposition, scroll or use the slider to zoom. The highlighted square is
@@ -187,14 +176,14 @@ export function BusinessSettingsPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button type="button" onClick={handleSaveCroppedLogo} disabled={uploadingLogo}>
-                {uploadingLogo ? 'Uploading…' : 'Save logo'}
+              <Button type="button" onClick={handleSaveCroppedLogo} disabled={uploadLogoMutation.isPending}>
+                {uploadLogoMutation.isPending ? 'Uploading…' : 'Save logo'}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setCropSrc(null)}
-                disabled={uploadingLogo}
+                disabled={uploadLogoMutation.isPending}
               >
                 Cancel
               </Button>
@@ -273,8 +262,8 @@ export function BusinessSettingsPage() {
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
         {saved && !error && <p className="text-sm text-muted-foreground">Saved.</p>}
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
+        <Button type="submit" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? 'Saving…' : 'Save'}
         </Button>
       </form>
     </div>

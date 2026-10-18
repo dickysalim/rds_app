@@ -18,21 +18,30 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatRupiahInput } from '@/lib/currency'
-import { createPayment, PAYMENT_METHODS, uploadPaymentEvidence, type Payment } from '@/lib/nota'
+import { createBillPayment, PAYMENT_METHODS, uploadPaymentEvidence } from '@/lib/nota'
 
+// A payment belongs to the bill (customer + month), not a single nota.
 export function MakePaymentDialog({
-  notaId,
+  customerId,
+  year,
+  month,
+  defaultAmount,
   open,
   onClose,
   onCreated,
 }: {
-  notaId: number
+  customerId: number
+  year: number
+  month: number
+  defaultAmount?: number
   open: boolean
   onClose: () => void
-  onCreated: (payment: Payment) => void
+  onCreated: () => void
 }) {
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [amountDisplay, setAmountDisplay] = useState('')
+  const [amountDisplay, setAmountDisplay] = useState(() =>
+    defaultAmount && defaultAmount > 0 ? formatRupiahInput(String(defaultAmount)) : '',
+  )
   const [method, setMethod] = useState('')
   const [reference, setReference] = useState('')
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
@@ -42,7 +51,7 @@ export function MakePaymentDialog({
 
   function reset() {
     setPaymentDate(new Date().toISOString().slice(0, 10))
-    setAmountDisplay('')
+    setAmountDisplay(defaultAmount && defaultAmount > 0 ? formatRupiahInput(String(defaultAmount)) : '')
     setMethod('')
     setReference('')
     setEvidenceFile(null)
@@ -64,18 +73,20 @@ export function MakePaymentDialog({
     setSaving(true)
     setError(null)
     try {
-      const payment = await createPayment(notaId, {
+      const payment = await createBillPayment(customerId, {
+        year,
+        month,
         payment_date: paymentDate,
         amount: amountNum,
         method,
         reference: reference || null,
       })
       if (evidenceFile) {
-        await uploadPaymentEvidence(notaId, payment.payment_id, evidenceFile).catch(() => {})
+        await uploadPaymentEvidence(payment.payment_id, evidenceFile).catch(() => {})
       }
       reset()
       onClose()
-      onCreated(payment)
+      onCreated()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record payment')
     } finally {
@@ -96,7 +107,7 @@ export function MakePaymentDialog({
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Make Payment</DialogTitle>
+            <DialogTitle>Add Payment</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-4">
             <div className="space-y-1">

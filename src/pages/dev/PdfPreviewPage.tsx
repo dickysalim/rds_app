@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select'
 import { getBusiness, type Business } from '@/lib/business'
 import { getNota, listNota, type NotaDetail, type NotaListItem } from '@/lib/nota'
-import { previewNotaPdfUrl } from '@/lib/notaPdf'
+import { invalidateNotaPdfCache, previewNotaPdfUrl } from '@/lib/notaPdf'
 
 const MOCK_SKUS = [
   { name: 'Mika Kopling KPH', unit: 'pcs', qty: 1000, price: 485 },
@@ -75,6 +75,8 @@ export function PdfPreviewPage() {
     setError(null)
     try {
       const nota = selectedNotaId === MOCK_OPTION_ID ? MOCK_NOTA : await getNota(selectedNotaId)
+      // Dev harness always wants the latest code, never a cached blob.
+      invalidateNotaPdfCache(nota.nota_id)
       const url = await previewNotaPdfUrl(nota, business)
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = url

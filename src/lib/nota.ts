@@ -2,17 +2,31 @@ import { API_URL, apiFetch } from '@/lib/api'
 
 export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Check', 'Other'] as const
 
-export const UNITS = ['pcs', 'box', 'pack', 'roll', 'kg', 'gram', 'liter', 'meter'] as const
+export const UNITS = ['pcs', 'box', 'lusin', 'kodi', 'rim', 'pack', 'kg', 'gram', 'liter', 'meter', 'roll', 'set', 'lembar', 'batang', 'kaleng', 'drum'] as const
 
 export interface NotaListItem {
   nota_id: number
   nota_number: string
   nota_date: string
+  customer_id: number
   customer_company_name_snapshot: string
   contact_name_snapshot: string
   total_price: number
   paid_amount: number
   status: string
+}
+
+export function statusLabel(status: string): string {
+  switch (status) {
+    case 'paid':
+      return 'Paid'
+    case 'partial':
+      return 'Partially Paid'
+    case 'unpaid':
+      return 'Unpaid'
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1)
+  }
 }
 
 export function statusPillClass(status: string): string {
@@ -123,6 +137,7 @@ export async function voidNota(notaId: number): Promise<void> {
   }
 }
 
+// A payment belongs to the bill (customer + month), not a single nota.
 export interface Payment {
   payment_id: number
   payment_number: string | null
@@ -131,24 +146,44 @@ export interface Payment {
   method: string | null
   reference: string | null
   evidence_key: string | null
+  customer_id: number
+  bill_year: number
+  bill_month: number
+  bill_settled: number
 }
 
-export async function listPayments(notaId: number): Promise<Payment[]> {
-  const res = await apiFetch(`/nota/${notaId}/payments`)
+export function billPeriodOf(n: { nota_date: string }): { year: number; month: number } {
+  return { year: Number(n.nota_date.slice(0, 4)), month: Number(n.nota_date.slice(5, 7)) }
+}
+
+export function billNumber(customerId: number, year: number, month: number): string {
+  const yy = String(year).slice(-2)
+  const mm = String(month).padStart(2, '0')
+  return `BIL/${yy}${mm}/${customerId}`
+}
+
+export async function listBillPayments(
+  customerId: number,
+  year: number,
+  month: number,
+): Promise<Payment[]> {
+  const res = await apiFetch(`/customers/${customerId}/bill-payments?year=${year}&month=${month}`)
   if (!res.ok) throw new Error('Failed to load payments')
   const data = (await res.json()) as { payments: Payment[] }
   return data.payments
 }
 
 export interface PaymentInput {
+  year: number
+  month: number
   payment_date: string
   amount: number
   method: string
   reference?: string | null
 }
 
-export async function createPayment(notaId: number, input: PaymentInput): Promise<Payment> {
-  const res = await apiFetch(`/nota/${notaId}/payments`, {
+export async function createBillPayment(customerId: number, input: PaymentInput): Promise<Payment> {
+  const res = await apiFetch(`/customers/${customerId}/bill-payments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -158,16 +193,20 @@ export async function createPayment(notaId: number, input: PaymentInput): Promis
   return data.payment
 }
 
-export function getPaymentEvidenceUrl(notaId: number, paymentId: number): string {
-  return `${API_URL}/nota/${notaId}/payments/${paymentId}/evidence?t=${Date.now()}`
+export async function voidPayment(paymentId: number): Promise<void> {
+  const res = await apiFetch(`/payments/${paymentId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? 'Failed to delete payment')
+  }
 }
 
-export async function uploadPaymentEvidence(
-  notaId: number,
-  paymentId: number,
-  blob: Blob,
-): Promise<void> {
-  const res = await apiFetch(`/nota/${notaId}/payments/${paymentId}/evidence`, {
+export function getPaymentEvidenceUrl(paymentId: number): string {
+  return `${API_URL}/payments/${paymentId}/evidence?t=${Date.now()}`
+}
+
+export async function uploadPaymentEvidence(paymentId: number, blob: Blob): Promise<void> {
+  const res = await apiFetch(`/payments/${paymentId}/evidence`, {
     method: 'PUT',
     headers: { 'Content-Type': blob.type },
     body: blob,

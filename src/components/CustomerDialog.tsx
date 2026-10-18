@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createCustomer, updateCustomer, type Customer } from '@/lib/customers'
+import type { Customer } from '@/lib/customers'
+import { useCreateCustomerMutation, useUpdateCustomerMutation } from '@/lib/queries'
 
 export function CustomerDialog({
   open,
@@ -28,7 +29,9 @@ export function CustomerDialog({
   const [contactName, setContactName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const createMutation = useCreateCustomerMutation()
+  const updateMutation = useUpdateCustomerMutation()
+  const loading = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
     if (open) {
@@ -43,7 +46,6 @@ export function CustomerDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setLoading(true)
     try {
       const input = {
         company_name: companyName,
@@ -52,14 +54,12 @@ export function CustomerDialog({
         phone_number: phoneNumber,
       }
       const saved = customer
-        ? await updateCustomer(customer.customer_id, input)
-        : await createCustomer(input)
+        ? await updateMutation.mutateAsync({ customerId: customer.customer_id, input })
+        : await createMutation.mutateAsync(input)
       onSaved(saved)
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save customer')
-    } finally {
-      setLoading(false)
     }
   }
 
