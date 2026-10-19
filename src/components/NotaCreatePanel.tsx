@@ -391,8 +391,8 @@ export function NotaCreatePanel({
         <div className="space-y-2">
           <Label className="font-bold">Nota Item</Label>
 
-          <div className="rounded-md border">
-          <div className="hidden gap-2 border-b bg-white px-3 py-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
+          <div className="overflow-hidden rounded-xl border border-[oklch(0.75_0_0)] bg-white shadow-sm">
+          <div className="hidden gap-2 border-b border-[oklch(0.75_0_0)] bg-white px-3 py-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
             <span>SKU name</span>
             <span>Unit</span>
             <span>Qty</span>
@@ -401,18 +401,18 @@ export function NotaCreatePanel({
             <span />
           </div>
 
-          <div>
+          <div className="divide-y divide-[oklch(0.86_0_0)]">
             {items.map((row) => {
               const filteredProducts = products.filter((p) =>
                 p.sku_name.toLowerCase().includes(row.skuQuery.toLowerCase()),
               )
               const lockedBySku = row.skuId !== null
               const cellInputClass =
-                'min-w-0 rounded-none border-0 border-b bg-white shadow-none focus-visible:ring-0 focus-visible:border-b-ring'
+                'min-w-0 rounded-none border-0 border-b-[1.5px] border-b-[oklch(0.74_0_0)] bg-white shadow-none focus-visible:ring-0 focus-visible:border-b-ring'
               return (
               <div
                 key={row.key}
-                className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1"
+                className="grid grid-cols-1 bg-white gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1"
               >
                 <div className="relative min-w-0">
                   <Input
@@ -546,7 +546,7 @@ export function NotaCreatePanel({
               )
             })}
           </div>
-          <div className="border-t p-2">
+          <div className="border-t border-[oklch(0.75_0_0)] bg-white p-2">
             <Button
               type="button"
               variant="outline"
