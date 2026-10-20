@@ -138,7 +138,7 @@ export function NotaCreatePanel({
   function handlePickCompany(customer: Customer) {
     setCompanyName(customer.company_name)
     setCompanyAddress(customer.address ?? '')
-    setContactPerson(customer.contact_name ?? '')
+    setContactPerson(customer.contact_person ?? '')
     setPhoneNumber(customer.phone_number ?? '')
     setIsExistingCustomer(true)
     setSelectedCustomer(customer)
@@ -147,8 +147,8 @@ export function NotaCreatePanel({
   }
 
   const filteredCustomers = companyName
-    ? customers.filter((c) => c.company_name.toLowerCase().includes(companyName.toLowerCase()))
-    : customers
+    ? customers.filter((c) => c.company_name.toLowerCase().includes(companyName.toLowerCase())).slice(0, 5)
+    : customers.slice(0, 5)
 
   const grandTotal = items.reduce((sum, row) => sum + subtotalOf(row), 0)
 
@@ -156,11 +156,11 @@ export function NotaCreatePanel({
     e.preventDefault()
     setError(null)
 
-    if (!companyName || !contactPerson || !phoneNumber) {
+    if (!companyName.trim() || !contactPerson.trim() || !phoneNumber.trim()) {
       setError('Company name, contact person and phone number are required')
       return
     }
-    if (items.length === 0 || items.some((row) => !row.skuQuery || !row.unit || !row.qty)) {
+    if (items.length === 0 || items.some((row) => !row.skuQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a SKU name, unit and qty')
       return
     }
@@ -172,24 +172,24 @@ export function NotaCreatePanel({
     setConfirmSave(false)
     setError(null)
 
-    if (!companyName || !contactPerson || !phoneNumber) {
+    if (!companyName.trim() || !contactPerson.trim() || !phoneNumber.trim()) {
       setError('Company name, contact person and phone number are required')
       return
     }
-    if (items.length === 0 || items.some((row) => !row.skuQuery || !row.unit || !row.qty)) {
+    if (items.length === 0 || items.some((row) => !row.skuQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a SKU name, unit and qty')
       return
     }
 
     const input: NotaInput = {
       nota_date: notaDate,
-      company_name: companyName,
-      company_address: companyAddress || null,
-      contact_name: contactPerson,
-      phone_number: phoneNumber,
+      company_name: companyName.trim(),
+      company_address: companyAddress.trim() || null,
+      contact_name: contactPerson.trim(),
+      phone_number: phoneNumber.trim(),
       items: items.map((row) => ({
         sku_id: row.skuId,
-        sku_name: row.skuQuery,
+        sku_name: row.skuQuery.trim(),
         unit: row.unit,
         price: toNumber(row.priceDisplay),
         qty: Number(row.qty),
@@ -204,7 +204,7 @@ export function NotaCreatePanel({
       const customerDataChanged =
         isExistingCustomer &&
         selectedCustomer !== null &&
-        (contactPerson !== (selectedCustomer.contact_name ?? '') ||
+        (contactPerson !== (selectedCustomer.contact_person ?? '') ||
           phoneNumber !== (selectedCustomer.phone_number ?? '') ||
           companyAddress !== (selectedCustomer.address ?? ''))
 
@@ -228,10 +228,10 @@ export function NotaCreatePanel({
         await updateCustomerMutation.mutateAsync({
           customerId: selectedCustomer.customer_id,
           input: {
-            company_name: companyName,
-            address: companyAddress || null,
-            contact_name: contactPerson,
-            phone_number: phoneNumber,
+            company_name: companyName.trim(),
+            address: companyAddress.trim() || null,
+            contact_person: contactPerson.trim(),
+            phone_number: phoneNumber.trim(),
           },
         })
       } catch {
@@ -333,8 +333,8 @@ export function NotaCreatePanel({
               autoComplete="off"
               required
             />
-            {showCustomerSuggestions && filteredCustomers.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
+            {showCustomerSuggestions && companyName.trim() && filteredCustomers.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
                 {filteredCustomers.map((c, idx) => (
                   <button
                     key={c.customer_id}
@@ -380,8 +380,10 @@ export function NotaCreatePanel({
           </Label>
           <Input
             id="phone_number"
+            type="tel"
+            inputMode="numeric"
             value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
+            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
             disabled={isExistingCustomer}
             className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
             required
@@ -391,8 +393,8 @@ export function NotaCreatePanel({
         <div className="space-y-2">
           <Label className="font-bold">Nota Item</Label>
 
-          <div className="overflow-hidden rounded-xl border border-[oklch(0.75_0_0)] bg-white shadow-sm">
-          <div className="hidden gap-2 border-b border-[oklch(0.75_0_0)] bg-white px-3 py-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
+          <div className="rounded-xl border border-[oklch(0.75_0_0)] bg-white shadow-sm">
+          <div className="hidden gap-2 rounded-t-xl border-b border-[oklch(0.75_0_0)] bg-white px-3 pb-3 pt-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
             <span>SKU name</span>
             <span>Unit</span>
             <span>Qty</span>
@@ -401,18 +403,18 @@ export function NotaCreatePanel({
             <span />
           </div>
 
-          <div className="divide-y divide-[oklch(0.86_0_0)]">
+          <div className="pt-2">
             {items.map((row) => {
               const filteredProducts = products.filter((p) =>
                 p.sku_name.toLowerCase().includes(row.skuQuery.toLowerCase()),
-              )
+              ).slice(0, 5)
               const lockedBySku = row.skuId !== null
               const cellInputClass =
-                'min-w-0 rounded-none border-0 border-b-[1.5px] border-b-[oklch(0.74_0_0)] bg-white shadow-none focus-visible:ring-0 focus-visible:border-b-ring'
+                'min-w-0 bg-white'
               return (
               <div
                 key={row.key}
-                className="grid grid-cols-1 bg-white gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1"
+                className="grid grid-cols-1 bg-white gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1.5"
               >
                 <div className="relative min-w-0">
                   <Input
@@ -422,8 +424,16 @@ export function NotaCreatePanel({
                     className={cellInputClass}
                     value={row.skuQuery}
                     onChange={(e) => {
+                      const typed = e.target.value
+                      const exact = products.find(
+                        (p) => p.sku_name.trim().toLowerCase() === typed.trim().toLowerCase(),
+                      )
+                      if (exact) {
+                        handlePickProduct(row.key, exact)
+                        return
+                      }
                       updateItem(row.key, {
-                        skuQuery: e.target.value,
+                        skuQuery: typed,
                         skuId: null,
                         showSuggestions: true,
                         highlightedIndex: -1,
@@ -460,7 +470,7 @@ export function NotaCreatePanel({
                     autoComplete="off"
                   />
                   {row.showSuggestions && row.skuQuery && filteredProducts.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
                       {filteredProducts.map((p, idx) => (
                         <button
                           key={p.sku_id}
@@ -546,7 +556,7 @@ export function NotaCreatePanel({
               )
             })}
           </div>
-          <div className="border-t border-[oklch(0.75_0_0)] bg-white p-2">
+          <div className="rounded-b-xl border-t border-[oklch(0.75_0_0)] bg-white p-2">
             <Button
               type="button"
               variant="outline"

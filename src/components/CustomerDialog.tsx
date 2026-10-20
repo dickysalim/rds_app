@@ -37,7 +37,7 @@ export function CustomerDialog({
     if (open) {
       setCompanyName(customer?.company_name ?? '')
       setAddress(customer?.address ?? '')
-      setContactName(customer?.contact_name ?? '')
+      setContactName(customer?.contact_person ?? '')
       setPhoneNumber(customer?.phone_number ?? '')
       setError(null)
     }
@@ -48,10 +48,10 @@ export function CustomerDialog({
     setError(null)
     try {
       const input = {
-        company_name: companyName,
-        address: address || null,
-        contact_name: contactName,
-        phone_number: phoneNumber,
+        company_name: companyName.trim(),
+        address: address.trim() || null,
+        contact_person: contactName.trim(),
+        phone_number: phoneNumber.trim(),
       }
       const saved = customer
         ? await updateMutation.mutateAsync({ customerId: customer.customer_id, input })
@@ -103,7 +103,8 @@ export function CustomerDialog({
               id="phone_number"
               type="tel"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              inputMode="numeric"
+              onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
               required
             />
           </div>

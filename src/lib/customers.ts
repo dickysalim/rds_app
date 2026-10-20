@@ -4,9 +4,10 @@ export interface Customer {
   customer_id: number
   company_name: string
   address: string | null
-  contact_id: number | null
-  contact_name: string | null
+  contact_person: string | null
   phone_number: string | null
+  updated_by: string | null
+  updated_at: string
 }
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -19,7 +20,7 @@ export async function listCustomers(): Promise<Customer[]> {
 export interface CustomerInput {
   company_name: string
   address: string | null
-  contact_name: string
+  contact_person: string
   phone_number: string
 }
 
@@ -54,4 +55,16 @@ export async function deleteCustomer(customerId: number): Promise<void> {
     const data = (await res.json().catch(() => null)) as { error?: string } | null
     throw new Error(data?.error ?? 'Failed to delete customer')
   }
+}
+
+export interface CustomerHistoryEntry extends Customer {
+  row_increment: number
+  is_active: number
+}
+
+export async function getCustomerHistory(customerId: number): Promise<CustomerHistoryEntry[]> {
+  const res = await apiFetch(`/customers/${customerId}/history`)
+  if (!res.ok) throw new Error('Failed to load customer history')
+  const data = (await res.json()) as { history: CustomerHistoryEntry[] }
+  return data.history
 }

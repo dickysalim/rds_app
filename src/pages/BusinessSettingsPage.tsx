@@ -81,14 +81,14 @@ export function BusinessSettingsPage() {
     setSaved(false)
     try {
       await updateMutation.mutateAsync({
-        business_name: businessName,
-        business_address: businessAddress || null,
-        business_contact_person: businessContactPerson || null,
-        business_contact_number: businessContactNumber || null,
-        business_email: businessEmail || null,
-        payment_bank_name: paymentBankName || null,
-        payment_account_name: paymentAccountName || null,
-        payment_account_number: paymentAccountNumber || null,
+        business_name: businessName.trim(),
+        business_address: businessAddress.trim() || null,
+        business_contact_person: businessContactPerson.trim() || null,
+        business_contact_number: businessContactNumber.trim() || null,
+        business_email: businessEmail.trim() || null,
+        payment_bank_name: paymentBankName.trim() || null,
+        payment_account_name: paymentAccountName.trim() || null,
+        payment_account_number: paymentAccountNumber.trim() || null,
       })
       setSaved(true)
     } catch (err) {
@@ -222,8 +222,10 @@ export function BusinessSettingsPage() {
           <Label htmlFor="business_contact_number">Contact Number</Label>
           <Input
             id="business_contact_number"
+            type="tel"
+            inputMode="numeric"
             value={businessContactNumber}
-            onChange={(e) => setBusinessContactNumber(e.target.value)}
+            onChange={(e) => setBusinessContactNumber(e.target.value.replace(/\D/g, ''))}
           />
         </div>
         <div className="space-y-2">
@@ -256,8 +258,9 @@ export function BusinessSettingsPage() {
           <Label htmlFor="payment_account_number">Account Number</Label>
           <Input
             id="payment_account_number"
+            inputMode="numeric"
             value={paymentAccountNumber}
-            onChange={(e) => setPaymentAccountNumber(e.target.value)}
+            onChange={(e) => setPaymentAccountNumber(e.target.value.replace(/\D/g, ''))}
           />
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}

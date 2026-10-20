@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ProductDialog } from '@/components/ProductDialog'
+import { ProductHistoryDialog } from '@/components/ProductHistoryDialog'
 import { formatRupiah } from '@/lib/currency'
 import type { Product } from '@/lib/products'
 import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
@@ -37,6 +38,7 @@ export function ProductPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
 
   function handleSaved() {
@@ -73,7 +75,8 @@ export function ProductPage() {
           + Add New Product
         </Button>
       </div>
-      <Table>
+      <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+<Table>
         <TableHeader>
           <TableRow>
             <TableHead>SKU ID</TableHead>
@@ -96,9 +99,9 @@ export function ProductPage() {
               </TableCell>
             </TableRow>
           ) : (
-            filteredProducts.map((product) => (
+            filteredProducts.slice().sort((a, b) => b.sku_id - a.sku_id).map((product) => (
               <TableRow key={product.sku_id}>
-                <TableCell>{product.sku_id}</TableCell>
+                <TableCell>{String(product.sku_id).padStart(3, '0')}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>
                 <TableCell>
                   {product.suggested_price != null
@@ -121,6 +124,9 @@ export function ProductPage() {
                       >
                         Edit
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setHistoryProduct(product)}>
+                        History
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={() => setDeletingProduct(product)}
@@ -135,12 +141,20 @@ export function ProductPage() {
           )}
         </TableBody>
       </Table>
+</div>
 
       <ProductDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         product={editingProduct}
         onSaved={handleSaved}
+      />
+
+      <ProductHistoryDialog
+        open={!!historyProduct}
+        onOpenChange={(open) => !open && setHistoryProduct(null)}
+        skuId={historyProduct?.sku_id ?? null}
+        skuName={historyProduct?.sku_name ?? null}
       />
 
       <AlertDialog open={!!deletingProduct} onOpenChange={(open) => !open && setDeletingProduct(null)}>

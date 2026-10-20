@@ -223,7 +223,8 @@ export function MonthlyNotaView({
   const { data: notaPage, isLoading: loading } = useNotaListQuery({
     q: debouncedSearch || undefined,
     status: status !== 'all' ? status : undefined,
-    year: year !== 'all' ? year : undefined,
+    startDate: year !== 'all' ? `${year}-01-01` : undefined,
+    endDate: year !== 'all' ? `${year}-12-31` : undefined,
   })
   const nota = notaPage?.nota ?? []
 

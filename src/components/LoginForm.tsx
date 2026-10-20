@@ -22,7 +22,7 @@ export function LoginForm({ onLogin }: { onLogin: (user: AuthUser) => void }) {
     setError(null)
     setLoading(true)
     try {
-      const user = await login(username, password)
+      const user = await login(username.trim(), password)
       onLogin(user)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')

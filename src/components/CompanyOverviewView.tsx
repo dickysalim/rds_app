@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +46,6 @@ import {
   queryKeys,
   useBusinessQuery,
   useCustomersQuery,
-  useNotaDateRangeQuery,
   useNotaListQuery,
   useVoidNotaMutation,
 } from '@/lib/queries'
@@ -99,35 +98,6 @@ function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
     .sort((a, b) => b.totalUnpaid - a.totalUnpaid || a.company.localeCompare(b.company))
 }
 
-function DrawerRow({
-  open,
-  colSpan,
-  className,
-  children,
-}: {
-  open: boolean
-  colSpan: number
-  className?: string
-  children: ReactNode
-}) {
-  return (
-    <TableRow className="border-0 hover:bg-transparent">
-      <TableCell
-        colSpan={colSpan}
-        className="p-0 leading-none"
-        style={{ lineHeight: 0, padding: 0 }}
-      >
-        <div
-          className="grid min-h-0 transition-[grid-template-rows] duration-300 ease-in-out"
-          style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
-        >
-          <div className={`min-h-0 overflow-hidden ${className ?? ''}`}>{children}</div>
-        </div>
-      </TableCell>
-    </TableRow>
-  )
-}
-
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
 
 export function CompanyOverviewView({
@@ -169,31 +139,24 @@ export function CompanyOverviewView({
     return () => clearTimeout(t)
   }, [search])
 
+  const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`
+  const monthEnd = new Date(selectedYear, selectedMonth, 0).toISOString().slice(0, 10)
+
   const { data: notaPage, isLoading: loading } = useNotaListQuery({
     q: debouncedSearch || undefined,
-    month: String(selectedMonth).padStart(2, '0'),
-    year: String(selectedYear),
+    startDate: monthStart,
+    endDate: monthEnd,
   })
   const nota = notaPage?.nota ?? []
 
-  const { data: dateRange } = useNotaDateRangeQuery()
-  const monthKey = selectedYear * 12 + selectedMonth
-  const minMonthKey =
-    dateRange?.minYear != null && dateRange?.minMonth != null
-      ? dateRange.minYear * 12 + dateRange.minMonth
-      : null
-  const maxMonthKey =
-    dateRange?.maxYear != null && dateRange?.maxMonth != null
-      ? dateRange.maxYear * 12 + dateRange.maxMonth
-      : null
-  const atEarliest = minMonthKey != null && monthKey <= minMonthKey
-  const atLatest = maxMonthKey != null && monthKey >= maxMonthKey
 
   const allCompanies = groupByCompany(nota)
   const companies = allCompanies.filter((c) => {
     if (status === 'all') return true
     return companyStatus(c) === status
   })
+  const modalCompany = allCompanies.find((c) => c.company === openCompany) ?? null
+  const modalPayments = modalCompany ? paymentsByCompany[modalCompany.company] : undefined
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
   const totals = sumTotals(nota)
@@ -201,8 +164,6 @@ export function CompanyOverviewView({
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 
   function shiftMonth(delta: number) {
-    if (delta < 0 && atEarliest) return
-    if (delta > 0 && atLatest) return
     setOpenCompany(null)
     let m = selectedMonth + delta
     let y = selectedYear
@@ -233,9 +194,8 @@ export function CompanyOverviewView({
 
   function toggleCompany(company: CompanyGroup) {
     const key = company.company
-    const opening = openCompany !== key
-    setOpenCompany(opening ? key : null)
-    if (opening && !paymentsByCompany[key]) {
+    setOpenCompany(key)
+    if (!paymentsByCompany[key]) {
       fetchCompanyPayments(company)
     }
   }
@@ -367,7 +327,6 @@ export function CompanyOverviewView({
           type="button"
           variant="default"
           size="icon"
-          disabled={atEarliest}
           onClick={() => shiftMonth(-1)}
         >
           <ChevronLeft className="h-5 w-5" />
@@ -377,7 +336,6 @@ export function CompanyOverviewView({
           type="button"
           variant="default"
           size="icon"
-          disabled={atLatest}
           onClick={() => shiftMonth(1)}
         >
           <ChevronRight className="h-5 w-5" />
@@ -463,8 +421,6 @@ export function CompanyOverviewView({
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : companies.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No nota found for {monthLabel}.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
           <Table className="table-fixed text-sm font-normal [&_td]:py-2">
@@ -489,9 +445,14 @@ export function CompanyOverviewView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {companies.map((company) => {
-                const companyOpen = openCompany === company.company
-                const companyPayments = paymentsByCompany[company.company]
+              {companies.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    No nota found for {monthLabel}.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                companies.map((company) => {
                 const companyState = companyStatus(company)
                 return (
                   <Fragment key={company.company}>
@@ -501,9 +462,6 @@ export function CompanyOverviewView({
                     >
                       <TableCell className="truncate pl-2" title={company.company}>
                         <div className="flex items-center gap-1.5">
-                          <ChevronDown
-                            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${companyOpen ? '' : '-rotate-90'}`}
-                          />
                           <span className="truncate">{company.company}</span>
                         </div>
                       </TableCell>
@@ -543,9 +501,70 @@ export function CompanyOverviewView({
                         </div>
                       </TableCell>
                     </TableRow>
+                  </Fragment>
+                )
+              })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
-                    <DrawerRow open={companyOpen} colSpan={7} className="bg-white">
-                      <div className="grid grid-cols-2 divide-x">
+      <Dialog open={modalCompany !== null} onOpenChange={(open) => !open && setOpenCompany(null)}>
+        <DialogContent className="max-w-5xl sm:max-w-5xl">
+          {modalCompany && ((company) => {
+            const settled = company.totalUnpaid <= 0
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-center text-xl font-bold">
+                    {company.company} - {monthLabel}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-3">
+                  <Card size="sm">
+                    <CardContent>
+                      <p className="text-xs text-muted-foreground">Total Nota</p>
+                      <p className="text-[22px] leading-tight font-semibold tabular-nums">{company.notaCount}</p>
+                    </CardContent>
+                  </Card>
+                  <Card size="sm">
+                    <CardContent>
+                      <p className="text-xs text-muted-foreground">Total Bill</p>
+                      <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                        {formatRupiah(company.totalBill)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card size="sm" className={settled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                    <CardContent>
+                      <p className={`text-xs ${settled ? 'text-green-800' : 'text-red-800'}`}>Total Paid</p>
+                      <p
+                        className={`text-[22px] leading-tight font-semibold tabular-nums break-all ${settled ? 'text-green-700' : 'text-red-700'}`}
+                      >
+                        {formatRupiah(company.totalPaid)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" variant="default" onClick={() => handlePrintBill(company)}>
+                    Print Bill
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={() => {
+                      setPaymentDialogCompany(company.company)
+                      setPaymentDialogCustomerId(company.nota[0].customer_id)
+                      setPaymentDialogDefaultAmount(company.totalUnpaid)
+                    }}
+                  >
+                    Add Payment
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-white [&_tr]:border-[oklch(0.86_0_0)]">
                         <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
@@ -596,7 +615,9 @@ export function CompanyOverviewView({
                             ))}
                           </TableBody>
                         </Table>
+</div>
 
+<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-white [&_tr]:border-[oklch(0.86_0_0)]">
                         <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
@@ -608,20 +629,20 @@ export function CompanyOverviewView({
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {!companyPayments ? (
+                            {!modalPayments ? (
                               <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground">
                                   Loading payments…
                                 </TableCell>
                               </TableRow>
-                            ) : companyPayments.length === 0 ? (
+                            ) : modalPayments.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground">
                                   No Payment Yet
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              companyPayments.map((payment) => (
+                              modalPayments.map((payment) => (
                                 <TableRow
                                   key={payment.payment_id}
                                   className="cursor-pointer hover:bg-accent/50"
@@ -667,15 +688,13 @@ export function CompanyOverviewView({
                             )}
                           </TableBody>
                         </Table>
-                      </div>
-                    </DrawerRow>
-                  </Fragment>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                        </div>
+                </div>
+              </>
+            )
+          })(modalCompany)}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteNotaId !== null} onOpenChange={(open) => !open && setDeleteNotaId(null)}>
         <AlertDialogContent>

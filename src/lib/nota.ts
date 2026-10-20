@@ -1,6 +1,6 @@
 import { API_URL, apiFetch } from '@/lib/api'
 
-export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Check', 'Other'] as const
+export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Giro', 'Other'] as const
 
 export const UNITS = ['pcs', 'box', 'lusin', 'kodi', 'rim', 'pack', 'kg', 'gram', 'liter', 'meter', 'roll', 'set', 'lembar', 'batang', 'kaleng', 'drum'] as const
 
@@ -50,16 +50,16 @@ export async function listNota(params?: {
   offset?: number
   q?: string
   status?: string
-  year?: string
-  month?: string
+  startDate?: string
+  endDate?: string
 }): Promise<NotaPage> {
   const query = new URLSearchParams()
   if (params?.limit != null) query.set('limit', String(params.limit))
   if (params?.offset != null) query.set('offset', String(params.offset))
   if (params?.q) query.set('q', params.q)
   if (params?.status) query.set('status', params.status)
-  if (params?.year) query.set('year', params.year)
-  if (params?.month) query.set('month', params.month)
+  if (params?.startDate) query.set('start_date', params.startDate)
+  if (params?.endDate) query.set('end_date', params.endDate)
   const qs = query.toString()
   const res = await apiFetch(`/nota${qs ? `?${qs}` : ''}`)
   if (!res.ok) throw new Error('Failed to load nota')

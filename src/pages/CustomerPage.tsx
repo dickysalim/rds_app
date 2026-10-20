@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { CustomerDialog } from '@/components/CustomerDialog'
+import { CustomerHistoryDialog } from '@/components/CustomerHistoryDialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,7 @@ export function CustomerPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null)
   const [search, setSearch] = useState('')
 
   function handleSaved() {
@@ -53,7 +55,9 @@ export function CustomerPage() {
     if (!q) return true
     return (
       c.company_name.toLowerCase().includes(q) ||
-      (c.contact_name ?? '').toLowerCase().includes(q)
+      (c.address ?? '').toLowerCase().includes(q) ||
+      (c.contact_person ?? '').toLowerCase().includes(q) ||
+      (c.phone_number ?? '').toLowerCase().includes(q)
     )
   })
 
@@ -63,7 +67,7 @@ export function CustomerPage() {
 
       <div className="flex items-center justify-between gap-2">
         <Input
-          placeholder="Search company or contact name…"
+          placeholder="Search customer…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-80"
@@ -77,7 +81,8 @@ export function CustomerPage() {
           + Add Customer
         </Button>
       </div>
-      <Table>
+      <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+<Table>
         <TableHeader>
           <TableRow>
             <TableHead>Cust. ID</TableHead>
@@ -104,13 +109,13 @@ export function CustomerPage() {
           ) : (
             filteredCustomers
               .slice()
-              .sort((a, b) => a.customer_id - b.customer_id)
+              .sort((a, b) => b.customer_id - a.customer_id)
               .map((customer) => (
                 <TableRow key={customer.customer_id}>
-                  <TableCell>{customer.customer_id}</TableCell>
+                  <TableCell>{String(customer.customer_id).padStart(3, '0')}</TableCell>
                   <TableCell>{customer.company_name}</TableCell>
                   <TableCell>{customer.address ?? '-'}</TableCell>
-                  <TableCell>{customer.contact_name ?? '-'}</TableCell>
+                  <TableCell>{customer.contact_person ?? '-'}</TableCell>
                   <TableCell>{customer.phone_number ?? '-'}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -128,6 +133,9 @@ export function CustomerPage() {
                         >
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setHistoryCustomer(customer)}>
+                          History
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           variant="destructive"
                           onClick={() => setDeletingCustomer(customer)}
@@ -142,12 +150,20 @@ export function CustomerPage() {
           )}
         </TableBody>
       </Table>
+</div>
 
       <CustomerDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         customer={editingCustomer}
         onSaved={handleSaved}
+      />
+
+      <CustomerHistoryDialog
+        open={!!historyCustomer}
+        onOpenChange={(open) => !open && setHistoryCustomer(null)}
+        customerId={historyCustomer?.customer_id ?? null}
+        companyName={historyCustomer?.company_name ?? null}
       />
 
       <AlertDialog

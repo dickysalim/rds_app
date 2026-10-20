@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatRupiahInput } from '@/lib/currency'
+import { formatRupiah, formatRupiahInput } from '@/lib/currency'
 import { createBillPayment, PAYMENT_METHODS, uploadPaymentEvidence } from '@/lib/nota'
 
 // A payment belongs to the bill (customer + month), not a single nota.
@@ -39,9 +39,7 @@ export function MakePaymentDialog({
   onCreated: () => void
 }) {
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [amountDisplay, setAmountDisplay] = useState(() =>
-    defaultAmount && defaultAmount > 0 ? formatRupiahInput(String(defaultAmount)) : '',
-  )
+  const [amountDisplay, setAmountDisplay] = useState('')
   const [method, setMethod] = useState('')
   const [reference, setReference] = useState('')
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
@@ -51,7 +49,7 @@ export function MakePaymentDialog({
 
   function reset() {
     setPaymentDate(new Date().toISOString().slice(0, 10))
-    setAmountDisplay(defaultAmount && defaultAmount > 0 ? formatRupiahInput(String(defaultAmount)) : '')
+    setAmountDisplay('')
     setMethod('')
     setReference('')
     setEvidenceFile(null)
@@ -79,7 +77,7 @@ export function MakePaymentDialog({
         payment_date: paymentDate,
         amount: amountNum,
         method,
-        reference: reference || null,
+        reference: reference.trim() || null,
       })
       if (evidenceFile) {
         await uploadPaymentEvidence(payment.payment_id, evidenceFile).catch(() => {})
@@ -135,6 +133,11 @@ export function MakePaymentDialog({
                   required
                 />
               </div>
+              {defaultAmount != null && (
+                <p className="text-xs text-muted-foreground">
+                  Still owed: {formatRupiah(Math.max(defaultAmount, 0))}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="payment_method">Method</Label>

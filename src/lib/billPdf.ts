@@ -105,8 +105,8 @@ function drawLetterhead(
   doc.setFont('helvetica', 'normal')
   doc.text(customer.company_name, MARGIN, sy, { maxWidth: customerMaxWidth })
   sy += 5.5
-  if (customer.contact_name) {
-    doc.text(customer.contact_name, MARGIN, sy, { maxWidth: customerMaxWidth })
+  if (customer.contact_person) {
+    doc.text(customer.contact_person, MARGIN, sy, { maxWidth: customerMaxWidth })
     sy += 5.5
   }
   if (customer.address) {

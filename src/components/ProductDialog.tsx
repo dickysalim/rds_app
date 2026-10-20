@@ -1,4 +1,14 @@
 import { useEffect, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -38,6 +48,7 @@ export function ProductDialog({
   const [unit, setUnit] = useState('')
   const [suggestedPrice, setSuggestedPrice] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const createMutation = useCreateProductMutation()
   const updateMutation = useUpdateProductMutation()
   const loading = createMutation.isPending || updateMutation.isPending
@@ -53,12 +64,27 @@ export function ProductDialog({
     }
   }, [open, product])
 
+  const initialPrice =
+    product?.suggested_price != null ? formatRupiahInput(String(product.suggested_price)) : ''
+  const dirty =
+    skuName !== (product?.sku_name ?? '') ||
+    unit !== (product?.unit ?? '') ||
+    suggestedPrice !== initialPrice
+
+  function handleOpenChange(next: boolean) {
+    if (!next && dirty && !loading) {
+      setConfirmDiscard(true)
+      return
+    }
+    onOpenChange(next)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     try {
       const input = {
-        sku_name: skuName,
+        sku_name: skuName.trim(),
         unit,
         suggested_price: suggestedPrice ? Number(suggestedPrice.replace(/\D/g, '')) : null,
       }
@@ -73,7 +99,7 @@ export function ProductDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{product ? 'Edit Product' : 'Add New Product'}</DialogTitle>
@@ -129,6 +155,27 @@ export function ProductDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. If you leave now, they will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDiscard(false)
+                onOpenChange(false)
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

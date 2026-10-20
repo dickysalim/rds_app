@@ -57,24 +57,6 @@ import { queryKeys, useBusinessQuery, useNotaListQuery, useVoidNotaMutation } fr
 
 const PAGE_SIZE = 25
 
-const MONTH_OPTIONS = [
-  { value: '01', label: 'January' },
-  { value: '02', label: 'February' },
-  { value: '03', label: 'March' },
-  { value: '04', label: 'April' },
-  { value: '05', label: 'May' },
-  { value: '06', label: 'June' },
-  { value: '07', label: 'July' },
-  { value: '08', label: 'August' },
-  { value: '09', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-]
-
-const CURRENT_YEAR = new Date().getFullYear()
-const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(CURRENT_YEAR - i))
-
 export function NotaPage() {
   const queryClient = useQueryClient()
   const { data: business } = useBusinessQuery()
@@ -83,8 +65,8 @@ export function NotaPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [month, setMonth] = useState('all')
-  const [year, setYear] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [view, setView] = useState<'list' | 'create'>('list')
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
@@ -104,15 +86,15 @@ export function NotaPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, status, month, year])
+  }, [debouncedSearch, status, startDate, endDate])
 
   const { data: notaPage, isLoading: loading } = useNotaListQuery({
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
     q: debouncedSearch || undefined,
     status: status !== 'all' ? status : undefined,
-    month: month !== 'all' ? month : undefined,
-    year: year !== 'all' ? year : undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
   })
   const nota = notaPage?.nota ?? []
   const total = notaPage?.total ?? 0
@@ -229,7 +211,7 @@ export function NotaPage() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Search customer or contact name…"
+            placeholder="Search nota…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-80"
@@ -245,33 +227,24 @@ export function NotaPage() {
               <SelectItem value="paid">Paid</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All months</SelectItem>
-              {MONTH_OPTIONS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="w-28">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All years</SelectItem>
-              {YEAR_OPTIONS.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(search || status !== 'all' || month !== 'all' || year !== 'all') && (
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            max={endDate || undefined}
+            className="w-36"
+            aria-label="Start date"
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            min={startDate || undefined}
+            className="w-36"
+            aria-label="End date"
+          />
+          {(search || status !== 'all' || startDate || endDate) && (
             <Button
               type="button"
               variant="ghost"
@@ -279,8 +252,8 @@ export function NotaPage() {
               onClick={() => {
                 setSearch('')
                 setStatus('all')
-                setMonth('all')
-                setYear('all')
+                setStartDate('')
+                setEndDate('')
               }}
             >
               Clear
@@ -290,7 +263,8 @@ export function NotaPage() {
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
       </div>
 
-      <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
+      <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+<Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
             <TableHead>Nota Number</TableHead>
@@ -453,6 +427,7 @@ export function NotaPage() {
           )}
         </TableBody>
       </Table>
+</div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>

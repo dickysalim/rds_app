@@ -150,8 +150,8 @@ export function useNotaListQuery(params?: {
   offset?: number
   q?: string
   status?: string
-  year?: string
-  month?: string
+  startDate?: string
+  endDate?: string
 }) {
   return useQuery({
     queryKey: queryKeys.notaList(params),
@@ -178,6 +178,8 @@ export function useCreateNotaMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nota', 'list'] })
       queryClient.invalidateQueries({ queryKey: queryKeys.notaDateRange })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers })
     },
   })
 }

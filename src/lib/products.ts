@@ -5,7 +5,8 @@ export interface Product {
   sku_name: string
   unit: string
   suggested_price: number | null
-  is_active: number
+  updated_by: string | null
+  updated_at: string
 }
 
 export async function listProducts(): Promise<Product[]> {
@@ -49,4 +50,16 @@ export async function deleteProduct(skuId: number): Promise<void> {
     const data = (await res.json().catch(() => null)) as { error?: string } | null
     throw new Error(data?.error ?? 'Failed to delete product')
   }
+}
+
+export interface ProductHistoryEntry extends Product {
+  row_increment: number
+  is_active: number
+}
+
+export async function getProductHistory(skuId: number): Promise<ProductHistoryEntry[]> {
+  const res = await apiFetch(`/products/${skuId}/history`)
+  if (!res.ok) throw new Error('Failed to load product history')
+  const data = (await res.json()) as { history: ProductHistoryEntry[] }
+  return data.history
 }
