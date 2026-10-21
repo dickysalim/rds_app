@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -740,10 +741,10 @@ export function CompanyOverviewView({
           ) : paymentPdfError ? (
             <p className="py-8 text-center text-sm text-destructive">{paymentPdfError}</p>
           ) : paymentPdfUrl ? (
-            <iframe
+            <PdfPreviewFrame
               title="Payment PDF"
-              src={paymentPdfUrl}
-              className="h-[60vh] w-full rounded-md border"
+              url={paymentPdfUrl}
+              frameClassName="h-[60vh] w-full rounded-md border"
             />
           ) : null}
         </DialogContent>
@@ -761,11 +762,7 @@ export function CompanyOverviewView({
           ) : billPdfError ? (
             <p className="py-8 text-center text-sm text-destructive">{billPdfError}</p>
           ) : billPdfUrl ? (
-            <iframe
-              title="Bill PDF"
-              src={billPdfUrl}
-              className="h-[80vh] w-full rounded-md border"
-            />
+            <PdfPreviewFrame title="Bill PDF" url={billPdfUrl} />
           ) : null}
         </DialogContent>
       </Dialog>

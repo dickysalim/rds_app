@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -811,10 +812,10 @@ export function MonthlyNotaView({
           ) : paymentPdfError ? (
             <p className="py-8 text-center text-sm text-destructive">{paymentPdfError}</p>
           ) : paymentPdfUrl ? (
-            <iframe
+            <PdfPreviewFrame
               title="Payment PDF"
-              src={paymentPdfUrl}
-              className="h-[60vh] w-full rounded-md border"
+              url={paymentPdfUrl}
+              frameClassName="h-[60vh] w-full rounded-md border"
             />
           ) : null}
         </DialogContent>

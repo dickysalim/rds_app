@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { previewNotaPdfUrl } from '@/lib/notaPdf'
 import { useBusinessQuery, useNotaDetailQuery } from '@/lib/queries'
 
@@ -45,7 +46,7 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
         {error ? (
           <p className="py-8 text-center text-sm text-destructive">{error}</p>
         ) : pdfUrl ? (
-          <iframe title="Nota PDF" src={pdfUrl} className="h-[80vh] w-full rounded-md border" />
+          <PdfPreviewFrame title="Nota PDF" url={pdfUrl} />
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
         )}
