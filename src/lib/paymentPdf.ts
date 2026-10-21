@@ -261,6 +261,16 @@ export async function buildPaymentPdf(
   doc.setFontSize(18)
   doc.text(`Rp ${fmt(payment.amount)}`, nominalBoxX + nominalBoxW / 2, y - 0.5, { align: 'center' })
 
+  if (business.business_contact_person) {
+    doc.setFont('Caveat', 'normal')
+    doc.setFontSize(22)
+    doc.text(business.business_contact_person, CONTENT_RIGHT, y - 1, { align: 'right' })
+    doc.setDrawColor(0)
+    doc.setLineWidth(0.25)
+    const signatureWidth = Math.min(50, CONTENT_RIGHT - MARGIN)
+    doc.line(CONTENT_RIGHT - signatureWidth, y + 1.5, CONTENT_RIGHT, y + 1.5)
+  }
+
   return doc
 }
 
