@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +40,7 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { previewBillPdfUrl } from '@/lib/billPdf'
 import { formatRupiah } from '@/lib/currency'
-import { getNota, getPaymentEvidenceUrl, listBillPayments, statusLabel, statusPillClass, voidPayment, type NotaListItem, type Payment } from '@/lib/nota'
+import { getNota, getPaymentEvidenceUrl, listBillPayments, statusLabel, statusPillClass, sumTotals, voidPayment, type NotaListItem, type Payment, type Totals } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { downloadPaymentPdf, previewPaymentPdfUrl } from '@/lib/paymentPdf'
 import {
@@ -51,20 +51,9 @@ import {
   useVoidNotaMutation,
 } from '@/lib/queries'
 
-interface Totals {
-  notaCount: number
-  totalBill: number
-  totalUnpaid: number
-  totalPaid: number
-}
-
 interface CompanyGroup extends Totals {
   company: string
   nota: NotaListItem[]
-}
-
-function outstandingOf(n: NotaListItem): number {
-  return n.status === 'void' ? 0 : n.total_price - n.paid_amount
 }
 
 function companyStatus(c: Totals): 'paid' | 'unpaid' | 'partial' {
@@ -74,15 +63,6 @@ function companyStatus(c: Totals): 'paid' | 'unpaid' | 'partial' {
 }
 
 const STATUS_ORDER = { unpaid: 0, partial: 1, paid: 2 }
-
-function sumTotals(nota: NotaListItem[]): Totals {
-  return {
-    notaCount: nota.length,
-    totalBill: nota.reduce((sum, n) => sum + n.total_price, 0),
-    totalUnpaid: nota.reduce((sum, n) => sum + outstandingOf(n), 0),
-    totalPaid: nota.reduce((sum, n) => sum + n.paid_amount, 0),
-  }
-}
 
 function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
   const companies = new Map<string, NotaListItem[]>()
@@ -119,9 +99,8 @@ export function CompanyOverviewView({
   const { data: business } = useBusinessQuery()
   const { data: customers = [] } = useCustomersQuery()
   const voidMutation = useVoidNotaMutation()
-  const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -157,8 +136,7 @@ export function CompanyOverviewView({
   })
   const nota = notaPage?.nota ?? []
 
-
-  const allCompanies = groupByCompany(nota)
+  const allCompanies = useMemo(() => groupByCompany(nota), [nota])
   const companies = allCompanies.filter((c) => {
     if (status === 'all') return true
     return companyStatus(c) === status
@@ -167,7 +145,7 @@ export function CompanyOverviewView({
   const modalPayments = modalCompany ? paymentsByCompany[modalCompany.company] : undefined
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
-  const totals = sumTotals(nota)
+  const totals = useMemo(() => sumTotals(nota), [nota])
   const settledCompanyCount = allCompanies.filter((c) => c.totalPaid === c.totalBill).length
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 

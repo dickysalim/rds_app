@@ -16,6 +16,26 @@ export interface NotaListItem {
   status: string
 }
 
+export interface Totals {
+  notaCount: number
+  totalBill: number
+  totalUnpaid: number
+  totalPaid: number
+}
+
+export function outstandingOf(n: NotaListItem): number {
+  return n.status === 'void' ? 0 : n.total_price - n.paid_amount
+}
+
+export function sumTotals(nota: NotaListItem[]): Totals {
+  return {
+    notaCount: nota.length,
+    totalBill: nota.reduce((sum, n) => sum + n.total_price, 0),
+    totalUnpaid: nota.reduce((sum, n) => sum + outstandingOf(n), 0),
+    totalPaid: nota.reduce((sum, n) => sum + n.paid_amount, 0),
+  }
+}
+
 export function statusLabel(status: string): string {
   switch (status) {
     case 'paid':
