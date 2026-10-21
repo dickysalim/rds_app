@@ -10,7 +10,7 @@ import { billNumber, type Payment } from '@/lib/nota'
 type NotaLike = { nota_number: string; customer_company_name_snapshot: string }
 
 const PAGE_WIDTH = 210
-const PAGE_HEIGHT = 99
+const BASE_PAGE_HEIGHT = 99
 const MARGIN = 14
 const CONTENT_RIGHT = PAGE_WIDTH - MARGIN
 
@@ -139,22 +139,57 @@ function registerCaveatFont(doc: jsPDF) {
   doc.addFont('Caveat-Regular.ttf', 'Caveat', 'normal')
 }
 
-function fieldRow(doc: jsPDF, label: string, value: string, y: number, labelY = y) {
+// Returns the extra height (beyond a single line) the value consumed, so the
+// caller can push every row below it down by the same amount.
+function valueLine(doc: jsPDF, value: string, y: number): number {
+  doc.setFont('Caveat', 'normal')
+  doc.setFontSize(15)
+  const maxWidth = CONTENT_RIGHT - VALUE_X - 2
+  const lines = doc.splitTextToSize(value, maxWidth) as string[]
+  const lineHeight = doc.getLineHeight()
+  const extra = (lines.length - 1) * lineHeight
+
+  doc.text(lines, VALUE_X + 2, y + 0.2)
+
+  doc.setDrawColor(0)
+  doc.setLineWidth(0.3)
+  doc.line(VALUE_X, y + 1 + extra, CONTENT_RIGHT, y + 1 + extra)
+
+  return extra
+}
+
+// Returns the same extra-height value as valueLine (see above).
+function fieldRow(doc: jsPDF, label: string, value: string, y: number, labelY = y): number {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.5)
   doc.text(label, LABEL_X, labelY)
   doc.text(':', COLON_X, labelY)
-  valueLine(doc, value, y)
+  return valueLine(doc, value, y)
 }
 
-function valueLine(doc: jsPDF, value: string, y: number) {
-  doc.setDrawColor(0)
-  doc.setLineWidth(0.3)
-  doc.line(VALUE_X, y + 1, CONTENT_RIGHT, y + 1)
-
-  doc.setFont('Caveat', 'normal')
-  doc.setFontSize(15)
-  doc.text(value, VALUE_X + 2, y + 0.2, { maxWidth: CONTENT_RIGHT - VALUE_X - 2 })
+// Measures how much extra vertical space (beyond a single line) the field
+// values will need, so the page can be grown to fit before anything is
+// drawn — jsPDF's page size is fixed at construction time.
+function measureExtraHeight(
+  nota: NotaLike,
+  payment: Payment,
+): number {
+  const scratch = new jsPDF({ unit: 'mm' })
+  registerCaveatFont(scratch)
+  scratch.setFont('Caveat', 'normal')
+  scratch.setFontSize(15)
+  const maxWidth = CONTENT_RIGHT - VALUE_X - 2
+  const lineHeight = scratch.getLineHeight()
+  const linesOf = (value: string) => scratch.splitTextToSize(value, maxWidth).length
+  const [keterangan1, keterangan2] = billKeterangan(payment)
+  const values = [
+    nota.customer_company_name_snapshot,
+    formatDateLong(payment.payment_date),
+    terbilang(payment.amount),
+    keterangan1,
+    keterangan2,
+  ]
+  return values.reduce((sum, value) => sum + (linesOf(value) - 1) * lineHeight, 0)
 }
 
 export async function buildPaymentPdf(
@@ -162,12 +197,14 @@ export async function buildPaymentPdf(
   payment: Payment,
   business: Business,
 ): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT], orientation: 'landscape' })
+  const extraHeight = measureExtraHeight(nota, payment)
+  const pageHeight = BASE_PAGE_HEIGHT + extraHeight
+  const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, pageHeight], orientation: 'landscape' })
   registerCaveatFont(doc)
 
-  const background = generateGuillochePattern(PAGE_WIDTH, PAGE_HEIGHT)
+  const background = generateGuillochePattern(PAGE_WIDTH, pageHeight)
   if (background) {
-    doc.addImage(background, 'PNG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT)
+    doc.addImage(background, 'PNG', 0, 0, PAGE_WIDTH, pageHeight)
   }
 
   const logo = business.business_logo_key ? await loadColorLogoDataUrl() : null
@@ -180,8 +217,8 @@ export async function buildPaymentPdf(
   ].filter(Boolean).length
   const headerBottomRel = Math.max(20.5 + headerLines * 4, 10 + LOGO_SIZE) + 3
   const contentTop = 10
-  const contentBottom = headerBottomRel + 12 + ROW_GAP * 4 + 12 + 3
-  const oy = (PAGE_HEIGHT - (contentBottom - contentTop)) / 2 - contentTop
+  const contentBottom = headerBottomRel + 12 + ROW_GAP * 4 + 12 + 3 + extraHeight
+  const oy = (pageHeight - (contentBottom - contentTop)) / 2 - contentTop
 
   const textStartX = logo ? MARGIN + LOGO_SIZE + 4 : MARGIN
   if (logo) {
@@ -233,20 +270,16 @@ export async function buildPaymentPdf(
   doc.line(MARGIN, headerBottom, CONTENT_RIGHT, headerBottom)
 
   let y = headerBottom + 12
-  fieldRow(doc, 'Sudah di terima dari', nota.customer_company_name_snapshot, y)
+  y += ROW_GAP + fieldRow(doc, 'Sudah di terima dari', nota.customer_company_name_snapshot, y)
 
-  y += ROW_GAP
-  fieldRow(doc, 'Pada tanggal', formatDateLong(payment.payment_date), y)
+  y += ROW_GAP + fieldRow(doc, 'Pada tanggal', formatDateLong(payment.payment_date), y)
 
-  y += ROW_GAP
   const jumlahValue = `${terbilang(payment.amount)}`
-  fieldRow(doc, 'Jumlah', jumlahValue, y)
+  y += ROW_GAP + fieldRow(doc, 'Jumlah', jumlahValue, y)
 
-  y += ROW_GAP
   const [keterangan1, keterangan2] = billKeterangan(payment)
-  fieldRow(doc, 'Keterangan', keterangan1, y)
-  y += ROW_GAP
-  valueLine(doc, keterangan2, y)
+  y += ROW_GAP + fieldRow(doc, 'Keterangan', keterangan1, y)
+  y += ROW_GAP + valueLine(doc, keterangan2, y)
 
   y += 12
   doc.setFont('helvetica', 'bold')
