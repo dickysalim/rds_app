@@ -10,7 +10,6 @@ import { billNumber, type Payment } from '@/lib/nota'
 type NotaLike = { nota_number: string; customer_company_name_snapshot: string }
 
 const PAGE_WIDTH = 210
-const BASE_PAGE_HEIGHT = 99
 const MARGIN = 14
 const CONTENT_RIGHT = PAGE_WIDTH - MARGIN
 
@@ -128,8 +127,21 @@ function terbilang(amount: number): string {
   return words.charAt(0).toUpperCase() + words.slice(1) + ' rupiah'
 }
 
-const ROW_GAP = 7.5
+const ROW_GAP = 8
+// Distance between the two underlined lines of Jumlah / Keterangan.
+const LINE_GAP = 7.5
 const LOGO_SIZE = 16
+const TOP_MARGIN = 12
+const BOTTOM_MARGIN = 12
+// Letterhead always reserves room for its 3 lines (address, contact, email)
+// so the rest of the layout, and the page height, never shift per business.
+const HEADER_BOTTOM = TOP_MARGIN + 25.5
+const FIRST_ROW_Y = HEADER_BOTTOM + 12
+// Rows: Sudah di terima dari, Pada tanggal, Jumlah (2 lines), Keterangan (2 lines).
+const NOMINAL_GAP = 14
+const NOMINAL_Y =
+  FIRST_ROW_Y + ROW_GAP * 2 + (LINE_GAP + ROW_GAP) + LINE_GAP + NOMINAL_GAP
+const PAGE_HEIGHT = NOMINAL_Y + 3 + BOTTOM_MARGIN
 const LABEL_X = MARGIN
 const COLON_X = MARGIN + 44
 const VALUE_X = MARGIN + 48
@@ -139,57 +151,42 @@ function registerCaveatFont(doc: jsPDF) {
   doc.addFont('Caveat-Regular.ttf', 'Caveat', 'normal')
 }
 
-// Returns the extra height (beyond a single line) the value consumed, so the
-// caller can push every row below it down by the same amount.
-function valueLine(doc: jsPDF, value: string, y: number): number {
-  doc.setFont('Caveat', 'normal')
-  doc.setFontSize(15)
-  const maxWidth = CONTENT_RIGHT - VALUE_X - 2
-  const lines = doc.splitTextToSize(value, maxWidth) as string[]
-  const lineHeight = doc.getLineHeight()
-  const extra = (lines.length - 1) * lineHeight
-
-  doc.text(lines, VALUE_X + 2, y + 0.2)
-
+function valueLine(doc: jsPDF, value: string, y: number) {
   doc.setDrawColor(0)
   doc.setLineWidth(0.3)
-  doc.line(VALUE_X, y + 1 + extra, CONTENT_RIGHT, y + 1 + extra)
+  doc.line(VALUE_X, y + 1, CONTENT_RIGHT, y + 1)
 
-  return extra
+  doc.setFont('Caveat', 'normal')
+  doc.setFontSize(15)
+  doc.text(value, VALUE_X + 2, y + 0.2, { maxWidth: CONTENT_RIGHT - VALUE_X - 2 })
 }
 
-// Returns the same extra-height value as valueLine (see above).
-function fieldRow(doc: jsPDF, label: string, value: string, y: number, labelY = y): number {
+function fieldRow(doc: jsPDF, label: string, value: string, y: number, labelY = y) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.5)
   doc.text(label, LABEL_X, labelY)
   doc.text(':', COLON_X, labelY)
-  return valueLine(doc, value, y)
+  valueLine(doc, value, y)
 }
 
-// Measures how much extra vertical space (beyond a single line) the field
-// values will need, so the page can be grown to fit before anything is
-// drawn — jsPDF's page size is fixed at construction time.
-function measureExtraHeight(
-  nota: NotaLike,
-  payment: Payment,
-): number {
-  const scratch = new jsPDF({ unit: 'mm' })
-  registerCaveatFont(scratch)
-  scratch.setFont('Caveat', 'normal')
-  scratch.setFontSize(15)
-  const maxWidth = CONTENT_RIGHT - VALUE_X - 2
-  const lineHeight = scratch.getLineHeight()
-  const linesOf = (value: string) => scratch.splitTextToSize(value, maxWidth).length
-  const [keterangan1, keterangan2] = billKeterangan(payment)
-  const values = [
-    nota.customer_company_name_snapshot,
-    formatDateLong(payment.payment_date),
-    terbilang(payment.amount),
-    keterangan1,
-    keterangan2,
-  ]
-  return values.reduce((sum, value) => sum + (linesOf(value) - 1) * lineHeight, 0)
+// Jumlah (amount in words) always reserves two underlined lines, whether or
+// not the value actually wraps — so the layout never shifts depending on
+// payment amount. Same shape as the Keterangan row below it.
+function twoLineField(doc: jsPDF, label: string, line1: string, line2: string, y: number) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10.5)
+  doc.text(label, LABEL_X, y)
+  doc.text(':', COLON_X, y)
+
+  doc.setFont('Caveat', 'normal')
+  doc.setFontSize(15)
+  if (line1) doc.text(line1, VALUE_X + 2, y + 0.2)
+  if (line2) doc.text(line2, VALUE_X + 2, y + 0.2 + LINE_GAP)
+
+  doc.setDrawColor(0)
+  doc.setLineWidth(0.3)
+  doc.line(VALUE_X, y + 1, CONTENT_RIGHT, y + 1)
+  doc.line(VALUE_X, y + 1 + LINE_GAP, CONTENT_RIGHT, y + 1 + LINE_GAP)
 }
 
 export async function buildPaymentPdf(
@@ -197,32 +194,18 @@ export async function buildPaymentPdf(
   payment: Payment,
   business: Business,
 ): Promise<jsPDF> {
-  const extraHeight = measureExtraHeight(nota, payment)
-  const pageHeight = BASE_PAGE_HEIGHT + extraHeight
-  const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, pageHeight], orientation: 'landscape' })
+  const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT], orientation: 'landscape' })
   registerCaveatFont(doc)
-
-  const background = generateGuillochePattern(PAGE_WIDTH, pageHeight)
+  const background = generateGuillochePattern(PAGE_WIDTH, PAGE_HEIGHT)
   if (background) {
-    doc.addImage(background, 'PNG', 0, 0, PAGE_WIDTH, pageHeight)
+    doc.addImage(background, 'PNG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT)
   }
 
   const logo = business.business_logo_key ? await loadColorLogoDataUrl() : null
 
-  // Centre the content block vertically so top and bottom margins match.
-  const headerLines = [
-    business.business_address,
-    business.business_contact_person || business.business_contact_number,
-    business.business_email,
-  ].filter(Boolean).length
-  const headerBottomRel = Math.max(20.5 + headerLines * 4, 10 + LOGO_SIZE) + 3
-  const contentTop = 10
-  const contentBottom = headerBottomRel + 12 + ROW_GAP * 4 + 12 + 3 + extraHeight
-  const oy = (pageHeight - (contentBottom - contentTop)) / 2 - contentTop
-
   const textStartX = logo ? MARGIN + LOGO_SIZE + 4 : MARGIN
   if (logo) {
-    doc.addImage(logo, MARGIN, 10 + oy, LOGO_SIZE, LOGO_SIZE)
+    doc.addImage(logo, MARGIN, TOP_MARGIN, LOGO_SIZE, LOGO_SIZE)
   }
 
   const nameMaxWidth = CONTENT_RIGHT - textStartX
@@ -233,11 +216,11 @@ export async function buildPaymentPdf(
     nameFontSize -= 1
     doc.setFontSize(nameFontSize)
   }
-  doc.text(business.business_name, textStartX, 16 + oy)
+  doc.text(business.business_name, textStartX, TOP_MARGIN + 6)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  let hy = 20.5 + oy
+  let hy = TOP_MARGIN + 10.5
   if (business.business_address) {
     doc.text(business.business_address, textStartX, hy)
     hy += 4
@@ -256,32 +239,36 @@ export async function buildPaymentPdf(
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
-  doc.text('KWITANSI', CONTENT_RIGHT, 16 + oy, { align: 'right' })
+  doc.text('KWITANSI', CONTENT_RIGHT, TOP_MARGIN + 6, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9.5)
-  doc.text(`No. : ${payment.payment_number ?? nota.nota_number}`, CONTENT_RIGHT, 22 + oy, {
+  doc.text(`No. : ${payment.payment_number ?? nota.nota_number}`, CONTENT_RIGHT, TOP_MARGIN + 12, {
     align: 'right',
   })
 
-  const headerBottom = Math.max(hy, 10 + oy + LOGO_SIZE) + 3
   doc.setDrawColor(0)
   doc.setLineWidth(0.6)
-  doc.line(MARGIN, headerBottom, CONTENT_RIGHT, headerBottom)
+  doc.line(MARGIN, HEADER_BOTTOM, CONTENT_RIGHT, HEADER_BOTTOM)
 
-  let y = headerBottom + 12
-  y += ROW_GAP + fieldRow(doc, 'Sudah di terima dari', nota.customer_company_name_snapshot, y)
+  let y = FIRST_ROW_Y
+  fieldRow(doc, 'Sudah di terima dari', nota.customer_company_name_snapshot, y)
+  y += ROW_GAP
 
-  y += ROW_GAP + fieldRow(doc, 'Pada tanggal', formatDateLong(payment.payment_date), y)
+  fieldRow(doc, 'Pada tanggal', formatDateLong(payment.payment_date), y)
+  y += ROW_GAP
 
-  const jumlahValue = `${terbilang(payment.amount)}`
-  y += ROW_GAP + fieldRow(doc, 'Jumlah', jumlahValue, y)
+  const jumlahMaxWidth = CONTENT_RIGHT - VALUE_X - 2
+  const [jumlahLine1 = '', jumlahLine2 = ''] = doc.splitTextToSize(
+    terbilang(payment.amount),
+    jumlahMaxWidth,
+  ) as string[]
+  twoLineField(doc, 'Jumlah', jumlahLine1, jumlahLine2, y)
+  y += LINE_GAP + ROW_GAP
 
   const [keterangan1, keterangan2] = billKeterangan(payment)
-  y += ROW_GAP + fieldRow(doc, 'Keterangan', keterangan1, y)
-  y += ROW_GAP + valueLine(doc, keterangan2, y)
-
-  y += 12
+  twoLineField(doc, 'Keterangan', keterangan1, keterangan2, y)
+  y += LINE_GAP + NOMINAL_GAP
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
   doc.text('Nominal', MARGIN + 8, y)
