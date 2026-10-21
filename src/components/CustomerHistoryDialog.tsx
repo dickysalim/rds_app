@@ -40,7 +40,7 @@ export function CustomerHistoryDialog({
         </DialogHeader>
         <div className="h-[27.5rem] overflow-y-auto rounded-md border">
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-white">
+            <TableHeader className="sticky top-0 z-10 bg-panel">
               <TableRow>
                 <TableHead>Edited At</TableHead>
                 <TableHead>Edited By</TableHead>

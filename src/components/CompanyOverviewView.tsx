@@ -40,7 +40,7 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { previewBillPdfUrl } from '@/lib/billPdf'
 import { formatRupiah } from '@/lib/currency'
-import { getNota, listBillPayments, statusLabel, statusPillClass, voidPayment, type NotaListItem, type Payment } from '@/lib/nota'
+import { getNota, getPaymentEvidenceUrl, listBillPayments, statusLabel, statusPillClass, voidPayment, type NotaListItem, type Payment } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { downloadPaymentPdf, previewPaymentPdfUrl } from '@/lib/paymentPdf'
 import {
@@ -73,6 +73,8 @@ function companyStatus(c: Totals): 'paid' | 'unpaid' | 'partial' {
   return 'partial'
 }
 
+const STATUS_ORDER = { unpaid: 0, partial: 1, paid: 2 }
+
 function sumTotals(nota: NotaListItem[]): Totals {
   return {
     notaCount: nota.length,
@@ -96,7 +98,12 @@ function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
       nota: [...list].sort((a, b) => (a.nota_date < b.nota_date ? 1 : -1)),
       ...sumTotals(list),
     }))
-    .sort((a, b) => b.totalUnpaid - a.totalUnpaid || a.company.localeCompare(b.company))
+    .sort(
+      (a, b) =>
+        STATUS_ORDER[companyStatus(a)] - STATUS_ORDER[companyStatus(b)] ||
+        b.totalBill - a.totalBill ||
+        a.company.localeCompare(b.company),
+    )
 }
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
@@ -323,7 +330,7 @@ export function CompanyOverviewView({
 
   return (
     <div className="space-y-4 pb-[40vh]">
-      <div className="flex items-center justify-center gap-6 rounded-lg border border-[oklch(0.8_0_0)] bg-white py-4">
+      <div className="flex items-center justify-center gap-6 rounded-lg border border-[oklch(0.8_0_0)] bg-panel py-4">
         <Button
           type="button"
           variant="default"
@@ -423,7 +430,7 @@ export function CompanyOverviewView({
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+        <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
           <Table className="table-fixed text-sm font-normal [&_td]:py-2">
             <colgroup>
               <col className="w-40" />
@@ -436,13 +443,13 @@ export function CompanyOverviewView({
             </colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className="h-12 bg-white font-bold">Company</TableHead>
-                <TableHead className="h-12 bg-white text-right font-bold">Nota Count</TableHead>
-                <TableHead className="h-12 bg-white text-right font-bold">Total Bill</TableHead>
-                <TableHead className="h-12 bg-white text-right font-bold">Unpaid</TableHead>
-                <TableHead className="h-12 bg-white text-right font-bold">Paid</TableHead>
-                <TableHead className="h-12 bg-white font-bold">Status</TableHead>
-                <TableHead className="h-12 bg-white text-right font-bold">Actions</TableHead>
+                <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Unpaid</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Paid</TableHead>
+                <TableHead className="h-12 bg-panel font-bold">Status</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -458,7 +465,7 @@ export function CompanyOverviewView({
                 return (
                   <Fragment key={company.company}>
                     <TableRow
-                      className="h-9 cursor-pointer font-normal bg-white hover:bg-accent/40"
+                      className="h-9 cursor-pointer font-normal bg-panel hover:bg-accent/40"
                       onClick={() => toggleCompany(company)}
                     >
                       <TableCell className="truncate pl-2" title={company.company}>
@@ -512,7 +519,7 @@ export function CompanyOverviewView({
       )}
 
       <Dialog open={modalCompany !== null} onOpenChange={(open) => !open && setOpenCompany(null)}>
-        <DialogContent className="max-w-5xl sm:max-w-5xl">
+        <DialogContent className="w-[95vw] max-w-[1300px] sm:max-w-[1300px]">
           {modalCompany && ((company) => {
             const settled = company.totalUnpaid <= 0
             return (
@@ -564,13 +571,13 @@ export function CompanyOverviewView({
                     Add Payment
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-white [&_tr]:border-[oklch(0.86_0_0)]">
+                <div className="grid grid-cols-[440px_minmax(0,1fr)] gap-4">
+<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
                         <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="pl-6 font-bold">Nota Number</TableHead>
-                              <TableHead className="font-bold">Date</TableHead>
+                              <TableHead className="w-[130px] pl-3 font-bold">Nota Number</TableHead>
+                              <TableHead className="w-[85px] font-bold">Date</TableHead>
                               <TableHead className="text-right font-bold">Total</TableHead>
                               <TableHead className="w-10" />
                             </TableRow>
@@ -582,9 +589,9 @@ export function CompanyOverviewView({
                                 className="h-9 cursor-pointer hover:bg-accent/50"
                                 onClick={() => onSelectNota(n.nota_id)}
                               >
-                                <TableCell className="truncate pl-6">{n.nota_number}</TableCell>
-                                <TableCell className="truncate">{n.nota_date}</TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="whitespace-nowrap pl-3">{n.nota_number}</TableCell>
+                                <TableCell className="whitespace-nowrap">{n.nota_date}</TableCell>
+                                <TableCell className="whitespace-nowrap text-right">
                                   {formatRupiah(n.total_price)}
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
@@ -618,27 +625,29 @@ export function CompanyOverviewView({
                         </Table>
 </div>
 
-<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-white [&_tr]:border-[oklch(0.86_0_0)]">
+<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
                         <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="pl-3 font-bold">Payment ID</TableHead>
-                              <TableHead className="font-bold">Date</TableHead>
-                              <TableHead className="font-bold">Method</TableHead>
-                              <TableHead className="text-right font-bold">Amount</TableHead>
+                              <TableHead className="w-[130px] pl-3 font-bold">Payment ID</TableHead>
+                              <TableHead className="w-[85px] font-bold">Date</TableHead>
+                              <TableHead className="w-[110px] font-bold">Method</TableHead>
+                              <TableHead className="w-[130px] text-right font-bold">Amount</TableHead>
+                              <TableHead className="w-[75px] font-bold">Evidence</TableHead>
+                              <TableHead className="font-bold">Notes</TableHead>
                               <TableHead className="w-10" />
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {!modalPayments ? (
                               <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center text-muted-foreground">
                                   Loading payments…
                                 </TableCell>
                               </TableRow>
                             ) : modalPayments.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center text-muted-foreground">
                                   No Payment Yet
                                 </TableCell>
                               </TableRow>
@@ -649,13 +658,30 @@ export function CompanyOverviewView({
                                   className="cursor-pointer hover:bg-accent/50"
                                   onClick={() => handleSeePaymentPdf(company, payment)}
                                 >
-                                  <TableCell className="pl-3 truncate">
+                                  <TableCell className="whitespace-nowrap pl-3">
                                     {payment.payment_number ?? payment.payment_id}
                                   </TableCell>
-                                  <TableCell className="truncate">{payment.payment_date}</TableCell>
-                                  <TableCell className="truncate">{payment.method}</TableCell>
-                                  <TableCell className="text-right">
+                                  <TableCell className="whitespace-nowrap">{payment.payment_date}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{payment.method}</TableCell>
+                                  <TableCell className="whitespace-nowrap text-right">
                                     {formatRupiah(payment.amount)}
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    {payment.evidence_key ? (
+                                      <a
+                                        href={getPaymentEvidenceUrl(payment.payment_id)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary underline"
+                                      >
+                                        View
+                                      </a>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="whitespace-normal break-words">
+                                    {payment.reference ?? '-'}
                                   </TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <DropdownMenu>

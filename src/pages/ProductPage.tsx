@@ -75,7 +75,7 @@ export function ProductPage() {
           + Add New Product
         </Button>
       </div>
-      <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+      <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
 <Table>
         <TableHeader>
           <TableRow>

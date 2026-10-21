@@ -264,7 +264,7 @@ export function NotaPage() {
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
       </div>
 
-      <div className="overflow-x-auto rounded-md border bg-white shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+      <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
 <Table className="text-xs [&_th]:h-8 [&_td]:py-1.5">
         <TableHeader>
           <TableRow>
@@ -346,7 +346,7 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-white pl-14">
+                      <TableCell colSpan={10} className="bg-panel pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (

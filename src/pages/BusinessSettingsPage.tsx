@@ -130,7 +130,7 @@ export function BusinessSettingsPage() {
 
       {cropSrc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md space-y-3 rounded-md border bg-white p-4 shadow-lg">
+          <div className="w-full max-w-md space-y-3 rounded-md border bg-panel p-4 shadow-lg">
             <h2 className="font-semibold">Crop logo</h2>
             <p className="text-sm text-muted-foreground">
               Drag to reposition, scroll or use the slider to zoom. The highlighted square is

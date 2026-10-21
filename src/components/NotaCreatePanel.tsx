@@ -393,8 +393,8 @@ export function NotaCreatePanel({
         <div className="space-y-2">
           <Label className="font-bold">Nota Item</Label>
 
-          <div className="rounded-xl border border-[oklch(0.75_0_0)] bg-white shadow-sm">
-          <div className="hidden gap-2 rounded-t-xl border-b border-[oklch(0.75_0_0)] bg-white px-3 pb-3 pt-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
+          <div className="rounded-xl border border-[oklch(0.75_0_0)] bg-panel shadow-sm">
+          <div className="hidden gap-2 rounded-t-xl border-b border-[oklch(0.75_0_0)] bg-panel px-3 pb-3 pt-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem]">
             <span>SKU name</span>
             <span>Unit</span>
             <span>Qty</span>
@@ -414,7 +414,7 @@ export function NotaCreatePanel({
               return (
               <div
                 key={row.key}
-                className="grid grid-cols-1 bg-white gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1.5"
+                className="grid grid-cols-1 bg-panel gap-2 p-2 sm:grid-cols-[minmax(0,1.1fr)_7rem_5.5rem_10rem_10rem_2.25rem] sm:items-start sm:px-3 sm:py-1.5"
               >
                 <div className="relative min-w-0">
                   <Input
@@ -556,7 +556,7 @@ export function NotaCreatePanel({
               )
             })}
           </div>
-          <div className="rounded-b-xl border-t border-[oklch(0.75_0_0)] bg-white p-2">
+          <div className="rounded-b-xl border-t border-[oklch(0.75_0_0)] bg-panel p-2">
             <Button
               type="button"
               variant="outline"
