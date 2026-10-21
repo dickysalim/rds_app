@@ -732,7 +732,7 @@ export function CompanyOverviewView({
         open={paymentPdfLoading || paymentPdfUrl !== null || paymentPdfError !== null}
         onOpenChange={(open) => !open && closePaymentPdf()}
       >
-        <DialogContent className="max-w-3xl sm:max-w-3xl">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Bukti Pembayaran</DialogTitle>
           </DialogHeader>
@@ -744,7 +744,7 @@ export function CompanyOverviewView({
             <PdfPreviewFrame
               title="Payment PDF"
               url={paymentPdfUrl}
-              frameClassName="h-[60vh] w-full rounded-md border"
+              frameClassName="w-full rounded-md border"
             />
           ) : null}
         </DialogContent>
@@ -753,7 +753,7 @@ export function CompanyOverviewView({
         open={billPdfLoading || billPdfUrl !== null || billPdfError !== null}
         onOpenChange={(open) => !open && closeBillPdf()}
       >
-        <DialogContent className="max-w-5xl sm:max-w-5xl">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-5xl flex-col sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Tagihan</DialogTitle>
           </DialogHeader>
@@ -762,7 +762,7 @@ export function CompanyOverviewView({
           ) : billPdfError ? (
             <p className="py-8 text-center text-sm text-destructive">{billPdfError}</p>
           ) : billPdfUrl ? (
-            <PdfPreviewFrame title="Bill PDF" url={billPdfUrl} />
+            <PdfPreviewFrame title="Bill PDF" url={billPdfUrl} frameClassName="w-full rounded-md border" />
           ) : null}
         </DialogContent>
       </Dialog>

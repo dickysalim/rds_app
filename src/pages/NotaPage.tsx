@@ -495,7 +495,7 @@ export function NotaPage() {
         open={paymentPdfLoading || paymentPdfUrl !== null || paymentPdfError !== null}
         onOpenChange={(open) => !open && closePaymentPdf()}
       >
-        <DialogContent className="max-w-3xl sm:max-w-3xl">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Bukti Pembayaran</DialogTitle>
           </DialogHeader>
@@ -507,7 +507,7 @@ export function NotaPage() {
             <PdfPreviewFrame
               title="Payment PDF"
               url={paymentPdfUrl}
-              frameClassName="h-[60vh] w-full rounded-md border"
+              frameClassName="w-full rounded-md border"
             />
           ) : null}
         </DialogContent>

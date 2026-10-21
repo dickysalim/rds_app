@@ -39,14 +39,14 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
 
   return (
     <Dialog open onOpenChange={(open) => !open && onBack()}>
-      <DialogContent className="max-w-5xl sm:max-w-5xl">
+      <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-5xl flex-col sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{nota?.nota_number ?? 'Nota'}</DialogTitle>
         </DialogHeader>
         {error ? (
           <p className="py-8 text-center text-sm text-destructive">{error}</p>
         ) : pdfUrl ? (
-          <PdfPreviewFrame title="Nota PDF" url={pdfUrl} />
+          <PdfPreviewFrame title="Nota PDF" url={pdfUrl} frameClassName="w-full rounded-md border" />
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
         )}
