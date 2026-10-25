@@ -114,6 +114,7 @@ export function ProductDialog({
               id="sku_name"
               value={skuName}
               onChange={(e) => setSkuName(e.target.value)}
+              maxLength={60}
               required
             />
           </div>
@@ -144,6 +145,7 @@ export function ProductDialog({
                 className="pl-9"
                 value={suggestedPrice}
                 onChange={(e) => setSuggestedPrice(formatRupiahInput(e.target.value))}
+                maxLength={13}
               />
             </div>
           </div>

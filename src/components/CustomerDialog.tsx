@@ -81,12 +81,18 @@ export function CustomerDialog({
               id="company_name"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
+              maxLength={80}
               required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="address">Address</Label>
-            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Input
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              maxLength={150}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="contact_name">Contact Person Name</Label>
@@ -94,6 +100,7 @@ export function CustomerDialog({
               id="contact_name"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
+              maxLength={60}
               required
             />
           </div>
@@ -105,6 +112,7 @@ export function CustomerDialog({
               value={phoneNumber}
               inputMode="numeric"
               onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+              maxLength={15}
               required
             />
           </div>
