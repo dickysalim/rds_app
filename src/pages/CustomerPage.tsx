@@ -19,6 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { SortableTableHead } from '@/components/SortableTableHead'
+import { formatRupiah } from '@/lib/currency'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -30,6 +32,15 @@ import {
 } from '@/components/ui/table'
 import type { Customer } from '@/lib/customers'
 import { useCustomersQuery, useDeleteCustomerMutation } from '@/lib/queries'
+import { useSort } from '@/lib/useSort'
+
+type CustomerSortKey =
+  | 'customer_id'
+  | 'company_name'
+  | 'address'
+  | 'contact_person'
+  | 'phone_number'
+  | 'total_revenue'
 
 export function CustomerPage() {
   const { data: customers = [], isLoading: loading } = useCustomersQuery()
@@ -39,6 +50,10 @@ export function CustomerPage() {
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null)
   const [search, setSearch] = useState('')
+  const { sortKey, sortDir, toggle, applySort } = useSort<Customer, CustomerSortKey>(
+    'customer_id',
+    'desc',
+  )
 
   function handleSaved() {
     // Mutations already invalidate the shared customers query.
@@ -50,16 +65,19 @@ export function CustomerPage() {
     setDeletingCustomer(null)
   }
 
-  const filteredCustomers = customers.filter((c) => {
-    const q = search.trim().toLowerCase()
-    if (!q) return true
-    return (
-      c.company_name.toLowerCase().includes(q) ||
-      (c.address ?? '').toLowerCase().includes(q) ||
-      (c.contact_person ?? '').toLowerCase().includes(q) ||
-      (c.phone_number ?? '').toLowerCase().includes(q)
-    )
-  })
+  const filteredCustomers = applySort(
+    customers.filter((c) => {
+      const q = search.trim().toLowerCase()
+      if (!q) return true
+      return (
+        c.company_name.toLowerCase().includes(q) ||
+        (c.address ?? '').toLowerCase().includes(q) ||
+        (c.contact_person ?? '').toLowerCase().includes(q) ||
+        (c.phone_number ?? '').toLowerCase().includes(q)
+      )
+    }),
+    (row, key) => row[key] ?? '',
+  )
 
   return (
     <div className="space-y-4">
@@ -85,38 +103,60 @@ export function CustomerPage() {
 <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Cust. ID</TableHead>
-            <TableHead>Company Name</TableHead>
-            <TableHead>Address</TableHead>
-            <TableHead>Contact Person Name</TableHead>
-            <TableHead>Phone</TableHead>
+            <SortableTableHead active={sortKey === 'customer_id'} dir={sortDir} onClick={() => toggle('customer_id')}>
+              Cust. ID
+            </SortableTableHead>
+            <SortableTableHead active={sortKey === 'company_name'} dir={sortDir} onClick={() => toggle('company_name')}>
+              Company Name
+            </SortableTableHead>
+            <SortableTableHead active={sortKey === 'address'} dir={sortDir} onClick={() => toggle('address')}>
+              Address
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'contact_person'}
+              dir={sortDir}
+              onClick={() => toggle('contact_person')}
+            >
+              Contact Person Name
+            </SortableTableHead>
+            <SortableTableHead active={sortKey === 'phone_number'} dir={sortDir} onClick={() => toggle('phone_number')}>
+              Phone
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'total_revenue'}
+              dir={sortDir}
+              onClick={() => toggle('total_revenue')}
+              className="text-left"
+            >
+              Total Revenue
+            </SortableTableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredCustomers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 {search ? 'No matching customers.' : 'No customers yet.'}
               </TableCell>
             </TableRow>
           ) : (
-            filteredCustomers
-              .slice()
-              .sort((a, b) => b.customer_id - a.customer_id)
-              .map((customer) => (
+            filteredCustomers.map((customer) => (
                 <TableRow key={customer.customer_id}>
                   <TableCell>{String(customer.customer_id).padStart(3, '0')}</TableCell>
                   <TableCell>{customer.company_name}</TableCell>
                   <TableCell>{customer.address ?? '-'}</TableCell>
                   <TableCell>{customer.contact_person ?? '-'}</TableCell>
                   <TableCell>{customer.phone_number ?? '-'}</TableCell>
+                  <TableCell className="text-[#3EA768] font-medium">
+                    {formatRupiah(customer.total_revenue)}
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

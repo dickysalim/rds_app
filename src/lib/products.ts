@@ -7,6 +7,7 @@ export interface Product {
   suggested_price: number | null
   updated_by: string | null
   updated_at: string
+  total_revenue: number
 }
 
 export async function listProducts(): Promise<Product[]> {
@@ -52,7 +53,7 @@ export async function deleteProduct(skuId: number): Promise<void> {
   }
 }
 
-export interface ProductHistoryEntry extends Product {
+export interface ProductHistoryEntry extends Omit<Product, 'total_revenue'> {
   row_increment: number
   is_active: number
 }

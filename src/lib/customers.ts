@@ -8,6 +8,7 @@ export interface Customer {
   phone_number: string | null
   updated_by: string | null
   updated_at: string
+  total_revenue: number
 }
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -57,7 +58,7 @@ export async function deleteCustomer(customerId: number): Promise<void> {
   }
 }
 
-export interface CustomerHistoryEntry extends Customer {
+export interface CustomerHistoryEntry extends Omit<Customer, 'total_revenue'> {
   row_increment: number
   is_active: number
 }
