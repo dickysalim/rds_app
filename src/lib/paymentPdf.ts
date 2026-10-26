@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { Business } from '@/lib/business'
 import { CAVEAT_FONT_BASE64 } from '@/lib/caveatFont'
 import { generateGuillochePattern } from '@/lib/guillochePattern'
@@ -194,14 +194,16 @@ export async function buildPaymentPdf(
   payment: Payment,
   business: Business,
 ): Promise<jsPDF> {
+  const [{ jsPDF }, logo] = await Promise.all([
+    import('jspdf'),
+    business.business_logo_key ? loadColorLogoDataUrl() : Promise.resolve(null),
+  ])
   const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT], orientation: 'landscape' })
   registerCaveatFont(doc)
   const background = generateGuillochePattern(PAGE_WIDTH, PAGE_HEIGHT)
   if (background) {
     doc.addImage(background, 'PNG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT)
   }
-
-  const logo = business.business_logo_key ? await loadColorLogoDataUrl() : null
 
   const textStartX = logo ? MARGIN + LOGO_SIZE + 4 : MARGIN
   if (logo) {

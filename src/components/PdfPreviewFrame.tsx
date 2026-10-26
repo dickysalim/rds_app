@@ -57,7 +57,7 @@ export function PdfPreviewFrame({
         </Button>
       </div>
       <object
-        data={url}
+        data={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
         type="application/pdf"
         title={title}
         className={`min-h-0 flex-1 ${frameClassName}`}

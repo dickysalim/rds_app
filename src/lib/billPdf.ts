@@ -1,9 +1,29 @@
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import type { jsPDF } from 'jspdf'
 import type { Business } from '@/lib/business'
 import type { Customer } from '@/lib/customers'
 import { loadColorLogoDataUrl } from '@/lib/logoCache'
 import type { NotaListItem } from '@/lib/nota'
+
+// jsPDF + jspdf-autotable are a large dependency only needed once a PDF is
+// actually generated — loaded lazily here instead of at module import time
+// so pages that never touch PDFs don't ship it in their initial bundle.
+type JsPDFCtor = typeof import('jspdf').jsPDF
+type AutoTableFn = typeof import('jspdf-autotable').default
+
+let jsPDFCtor: JsPDFCtor | null = null
+let autoTableFn: AutoTableFn | null = null
+
+async function loadPdfLibs(): Promise<{ jsPDF: JsPDFCtor; autoTable: AutoTableFn }> {
+  if (!jsPDFCtor || !autoTableFn) {
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
+    jsPDFCtor = jsPDF
+    autoTableFn = autoTableModule.default
+  }
+  return { jsPDF: jsPDFCtor, autoTable: autoTableFn }
+}
 
 const PAGE_WIDTH = 210
 const PAGE_HEIGHT = 297
@@ -124,8 +144,11 @@ export async function buildBillPdf(
   year: number,
   month: number,
 ): Promise<jsPDF> {
+  const [{ jsPDF, autoTable }, logo] = await Promise.all([
+    loadPdfLibs(),
+    business.business_logo_key ? loadColorLogoDataUrl() : Promise.resolve(null),
+  ])
   const doc = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT] })
-  const logo = business.business_logo_key ? await loadColorLogoDataUrl() : null
   const billNo = billNumber(customer, year, month)
 
   const tableStartY = drawLetterhead(doc, business, customer, billNo, year, month, logo)

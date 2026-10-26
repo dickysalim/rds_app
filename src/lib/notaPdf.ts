@@ -1,9 +1,29 @@
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import type { jsPDF } from 'jspdf'
 import { apiFetch } from '@/lib/api'
 import type { Business } from '@/lib/business'
 import { loadGrayscaleLogoDataUrl } from '@/lib/logoCache'
 import type { NotaDetail } from '@/lib/nota'
+
+// jsPDF + jspdf-autotable are a large dependency only needed once a PDF is
+// actually generated — loaded lazily here instead of at module import time
+// so pages that never touch PDFs don't ship it in their initial bundle.
+type JsPDFCtor = typeof import('jspdf').jsPDF
+type AutoTableFn = typeof import('jspdf-autotable').default
+
+let jsPDFCtor: JsPDFCtor | null = null
+let autoTableFn: AutoTableFn | null = null
+
+async function loadPdfLibs(): Promise<{ jsPDF: JsPDFCtor; autoTable: AutoTableFn }> {
+  if (!jsPDFCtor || !autoTableFn) {
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
+    jsPDFCtor = jsPDF
+    autoTableFn = autoTableModule.default
+  }
+  return { jsPDF: jsPDFCtor, autoTable: autoTableFn }
+}
 
 // Epson LX-310 continuous tractor-feed paper: 9.5" wide (241.3mm), no fixed
 // page length — the page grows to fit however many items the nota has.
@@ -115,7 +135,7 @@ function drawLetterhead(doc: jsPDF, business: Business, nota: NotaDetail, logo: 
 function renderNota(doc: jsPDF, nota: NotaDetail, business: Business, logo: string | null): number {
   const tableStartY = drawLetterhead(doc, business, nota, logo)
 
-  autoTable(doc, {
+  autoTableFn!(doc, {
     startY: tableStartY,
     margin: { left: MARGIN, right: MARGIN },
     head: [['No.', 'Nama Item', 'Qty', 'Unit', 'Harga', 'Total']],
@@ -171,7 +191,10 @@ function renderNota(doc: jsPDF, nota: NotaDetail, business: Business, logo: stri
 }
 
 export async function buildNotaPdf(nota: NotaDetail, business: Business): Promise<jsPDF> {
-  const logo = business.business_logo_key ? await loadGrayscaleLogoDataUrl() : null
+  const [{ jsPDF }, logo] = await Promise.all([
+    loadPdfLibs(),
+    business.business_logo_key ? loadGrayscaleLogoDataUrl() : Promise.resolve(null),
+  ])
 
   // jsPDF flips y-coordinates using the page height at draw time, so the
   // final page height must be known before drawing. Measure on a generously
