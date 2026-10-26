@@ -17,7 +17,7 @@ export function AppLayout({
         <AppSidebar user={user} onLogout={onLogout} />
         <div className="flex min-h-svh w-full min-w-0 flex-col">
           <main className="min-w-0 flex-1 p-6">
-            <Outlet />
+            <Outlet context={user} />
           </main>
         </div>
       </SidebarProvider>

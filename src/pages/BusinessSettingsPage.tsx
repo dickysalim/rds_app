@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
+import { useOutletContext } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { isUsingStagingDb, setUsingStagingDb } from '@/lib/api'
+import type { AuthUser } from '@/lib/auth'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { getCroppedImageBlob } from '@/lib/cropImage'
 import {
+  resetAllCachesForDbSwitch,
   useBusinessQuery,
   useUpdateBusinessMutation,
   useUploadBusinessLogoMutation,
 } from '@/lib/queries'
 
 export function BusinessSettingsPage() {
+  const user = useOutletContext<AuthUser>()
+  const queryClient = useQueryClient()
   const { data: business, isLoading: loading } = useBusinessQuery()
   const updateMutation = useUpdateBusinessMutation()
   const uploadLogoMutation = useUploadBusinessLogoMutation()
@@ -27,6 +34,7 @@ export function BusinessSettingsPage() {
   const [logoVersion, setLogoVersion] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [useStaging, setUseStaging] = useState(() => isUsingStagingDb())
 
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
@@ -96,11 +104,34 @@ export function BusinessSettingsPage() {
     }
   }
 
+  function handleToggleStaging() {
+    const next = !useStaging
+    setUsingStagingDb(next)
+    setUseStaging(next)
+    resetAllCachesForDbSwitch(queryClient)
+  }
+
   if (loading) return null
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Business Settings</h1>
+
+      {user.role === 'super_admin' && (
+        <div className="flex items-center justify-between gap-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Staging Database</p>
+            <p className="text-sm text-muted-foreground">
+              {useStaging
+                ? 'Currently reading and writing the staging database (mock data), not the real one.'
+                : 'Currently on the real database. Flip this to test against staging instead.'}
+            </p>
+          </div>
+          <Button type="button" variant={useStaging ? 'default' : 'outline'} onClick={handleToggleStaging}>
+            {useStaging ? 'Staging: ON' : 'Staging: OFF'}
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>Logo</Label>

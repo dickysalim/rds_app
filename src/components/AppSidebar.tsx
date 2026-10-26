@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { isUsingStagingDb } from '@/lib/api'
 import type { AuthUser } from '@/lib/auth'
 import { useNavGuard } from '@/lib/nav-guard'
 import { useBusinessQuery } from '@/lib/queries'
@@ -41,6 +42,11 @@ export function AppSidebar({
   return (
     <Sidebar>
       <SidebarHeader>
+        {user.role === 'super_admin' && isUsingStagingDb() && (
+          <div className="mx-2 mt-2 rounded-md bg-amber-500 px-2 py-1 text-center text-xs font-semibold text-white">
+            STAGING DATABASE
+          </div>
+        )}
         <div className="flex flex-col items-center gap-2 px-2 py-3">
           {business?.business_logo_key ? (
             <img

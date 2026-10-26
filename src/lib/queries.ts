@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
   getBusiness,
   updateBusiness,
@@ -37,6 +37,14 @@ function invalidateAllPdfCaches() {
   clearAllNotaPdfCaches()
   clearBillPdfCache()
   clearPaymentPdfCache()
+}
+
+// Switching the Business Settings staging toggle swaps every DB-backed
+// response out from under the cache, so drop everything and let the
+// currently mounted pages refetch against the newly selected database.
+export function resetAllCachesForDbSwitch(queryClient: QueryClient) {
+  queryClient.clear()
+  invalidateAllPdfCaches()
 }
 
 // Centralized query keys so invalidation ("nota changed, refetch every nota

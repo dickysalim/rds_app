@@ -1,4 +1,4 @@
-import { apiFetch, clearToken, setToken } from '@/lib/api'
+import { apiFetch, clearToken, setToken, setUsingStagingDb } from '@/lib/api'
 
 export interface AuthUser {
   id: number
@@ -39,4 +39,5 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
 
 export function logout(): void {
   clearToken()
+  setUsingStagingDb(false)
 }
