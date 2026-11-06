@@ -5,9 +5,11 @@ export interface Product {
   sku_name: string
   unit: string
   suggested_price: number | null
+  cost_price: number | null
   updated_by: string | null
   updated_at: string
   total_revenue: number
+  total_cost: number
 }
 
 export async function listProducts(): Promise<Product[]> {

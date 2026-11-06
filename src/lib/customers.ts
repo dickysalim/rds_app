@@ -9,6 +9,7 @@ export interface Customer {
   updated_by: string | null
   updated_at: string
   total_revenue: number
+  total_cost: number
 }
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -21,8 +22,8 @@ export async function listCustomers(): Promise<Customer[]> {
 export interface CustomerInput {
   company_name: string
   address: string | null
-  contact_person: string
-  phone_number: string
+  contact_person: string | null
+  phone_number: string | null
 }
 
 export async function createCustomer(input: CustomerInput): Promise<Customer> {

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertDialog,
@@ -47,6 +47,7 @@ import {
   queryKeys,
   useBusinessQuery,
   useCustomersQuery,
+  useNotaDateRangeQuery,
   useNotaListQuery,
   useVoidNotaMutation,
 } from '@/lib/queries'
@@ -91,9 +92,11 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', year: 
 export function CompanyOverviewView({
   onAddNota,
   onSelectNota,
+  onDetailOpenChange,
 }: {
   onAddNota: () => void
   onSelectNota: (notaId: number) => void
+  onDetailOpenChange?: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
   const { data: business } = useBusinessQuery()
@@ -136,6 +139,23 @@ export function CompanyOverviewView({
   })
   const nota = notaPage?.nota ?? []
 
+  const { data: dateRange } = useNotaDateRangeQuery()
+  const fellBackRef = useRef(false)
+  useEffect(() => {
+    if (fellBackRef.current || loading || !dateRange) return
+    fellBackRef.current = true
+    if (nota.length > 0) return
+    if (dateRange.maxYear == null || dateRange.maxMonth == null) return
+    if (
+      dateRange.maxYear > selectedYear ||
+      (dateRange.maxYear === selectedYear && dateRange.maxMonth > selectedMonth)
+    ) {
+      return
+    }
+    setSelectedYear(dateRange.maxYear)
+    setSelectedMonth(dateRange.maxMonth)
+  }, [dateRange, loading, nota.length, selectedYear, selectedMonth])
+
   const allCompanies = useMemo(() => groupByCompany(nota), [nota])
   const companies = allCompanies.filter((c) => {
     if (status === 'all') return true
@@ -143,9 +163,15 @@ export function CompanyOverviewView({
   })
   const modalCompany = allCompanies.find((c) => c.company === openCompany) ?? null
   const modalPayments = modalCompany ? paymentsByCompany[modalCompany.company] : undefined
+
+  useEffect(() => {
+    onDetailOpenChange?.(modalCompany !== null)
+  }, [modalCompany, onDetailOpenChange])
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
   const totals = useMemo(() => sumTotals(nota), [nota])
+  const totalCost = useMemo(() => nota.reduce((sum, n) => sum + n.total_cost, 0), [nota])
+  const totalProfit = totals.totalBill - totalCost
   const settledCompanyCount = allCompanies.filter((c) => c.totalPaid === c.totalBill).length
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 
@@ -306,401 +332,8 @@ export function CompanyOverviewView({
     }
   }
 
-  return (
-    <div className="space-y-4 pb-[40vh]">
-      <div className="flex items-center justify-center gap-6 rounded-lg border border-[oklch(0.8_0_0)] bg-panel py-4">
-        <Button
-          type="button"
-          variant="default"
-          size="icon"
-          onClick={() => shiftMonth(-1)}
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <span className="w-56 text-center text-2xl font-bold">{monthLabel}</span>
-        <Button
-          type="button"
-          variant="default"
-          size="icon"
-          onClick={() => shiftMonth(1)}
-        >
-          <ChevronRight className="h-5 w-5" />
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-5 gap-3">
-        <Card size="sm">
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Total Nota</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums">{totals.notaCount}</p>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Total Company</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums">{allCompanies.length}</p>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Total Bill</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-              {formatRupiah(totals.totalBill)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="border-green-200 bg-green-50">
-          <CardContent>
-            <p className="text-xs text-green-800">Total Paid</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-green-700">
-              {formatRupiah(totals.totalPaid)}
-            </p>
-            <p className="text-xs text-green-700">{settledCompanyCount} Company Settled</p>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="border-red-200 bg-red-50">
-          <CardContent>
-            <p className="text-xs text-red-800">Total Unpaid</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-red-700">
-              {formatRupiah(totals.totalUnpaid)}
-            </p>
-            <p className="text-xs text-red-700">{unsettledCompanyCount} Company Unsettled</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search customer or contact name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-80"
-          />
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
-              <SelectItem value="partial">Partially Paid</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-            </SelectContent>
-          </Select>
-          {(search || status !== 'all') && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearch('')
-                setStatus('all')
-              }}
-            >
-              Clear
-            </Button>
-          )}
-        </div>
-        <Button onClick={onAddNota}>+ Add Nota</Button>
-      </div>
-
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
-          <Table className="table-fixed text-sm font-normal [&_td]:py-2">
-            <colgroup>
-              <col className="w-40" />
-              <col className="w-16" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-44" />
-            </colgroup>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Unpaid</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Paid</TableHead>
-                <TableHead className="h-12 bg-panel font-bold">Status</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {companies.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    No nota found for {monthLabel}.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                companies.map((company) => {
-                const companyState = companyStatus(company)
-                return (
-                  <Fragment key={company.company}>
-                    <TableRow
-                      className="h-9 cursor-pointer font-normal bg-panel hover:bg-accent/40"
-                      onClick={() => toggleCompany(company)}
-                    >
-                      <TableCell className="truncate pl-2" title={company.company}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{company.company}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{company.notaCount}</TableCell>
-                      <TableCell className="text-right">{formatRupiah(company.totalBill)}</TableCell>
-                      <TableCell className="text-right">
-                        {formatRupiah(company.totalUnpaid)}
-                      </TableCell>
-                      <TableCell className="text-right">{formatRupiah(company.totalPaid)}</TableCell>
-                      <TableCell>
-                        <span className={statusPillClass(companyState)}>{statusLabel(companyState)}</span>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            className="shadow-xs"
-                            onClick={() => handlePrintBill(company)}
-                          >
-                            Print Bill
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            className="shadow-xs"
-                            onClick={() => {
-                              setPaymentDialogCompany(company.company)
-                              setPaymentDialogCustomerId(company.nota[0].customer_id)
-                              setPaymentDialogDefaultAmount(company.totalUnpaid)
-                            }}
-                          >
-                            Add Payment
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </Fragment>
-                )
-              })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <Dialog open={modalCompany !== null} onOpenChange={(open) => !open && setOpenCompany(null)}>
-        <DialogContent className="w-[95vw] max-w-[1300px] sm:max-w-[1300px]">
-          {modalCompany && ((company) => {
-            const settled = company.totalUnpaid <= 0
-            return (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-center text-xl font-bold">
-                    {company.company} - {monthLabel}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="grid grid-cols-3 gap-3">
-                  <Card size="sm">
-                    <CardContent>
-                      <p className="text-xs text-muted-foreground">Total Nota</p>
-                      <p className="text-[22px] leading-tight font-semibold tabular-nums">{company.notaCount}</p>
-                    </CardContent>
-                  </Card>
-                  <Card size="sm">
-                    <CardContent>
-                      <p className="text-xs text-muted-foreground">Total Bill</p>
-                      <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-                        {formatRupiah(company.totalBill)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card size="sm" className={settled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
-                    <CardContent>
-                      <p className={`text-xs ${settled ? 'text-green-800' : 'text-red-800'}`}>Total Paid</p>
-                      <p
-                        className={`text-[22px] leading-tight font-semibold tabular-nums break-all ${settled ? 'text-green-700' : 'text-red-700'}`}
-                      >
-                        {formatRupiah(company.totalPaid)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <Button type="button" variant="default" onClick={() => handlePrintBill(company)}>
-                    Print Bill
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="default"
-                    onClick={() => {
-                      setPaymentDialogCompany(company.company)
-                      setPaymentDialogCustomerId(company.nota[0].customer_id)
-                      setPaymentDialogDefaultAmount(company.totalUnpaid)
-                    }}
-                  >
-                    Add Payment
-                  </Button>
-                </div>
-                <div className="grid grid-cols-[440px_minmax(0,1fr)] gap-4">
-<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
-                        <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[130px] pl-3 font-bold">Nota Number</TableHead>
-                              <TableHead className="w-[85px] font-bold">Date</TableHead>
-                              <TableHead className="text-right font-bold">Total</TableHead>
-                              <TableHead className="w-10" />
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {company.nota.map((n) => (
-                              <TableRow
-                                key={n.nota_id}
-                                className="h-9 cursor-pointer hover:bg-accent/50"
-                                onClick={() => onSelectNota(n.nota_id)}
-                              >
-                                <TableCell className="whitespace-nowrap pl-3">{n.nota_number}</TableCell>
-                                <TableCell className="whitespace-nowrap">{n.nota_date}</TableCell>
-                                <TableCell className="whitespace-nowrap text-right">
-                                  {formatRupiah(n.total_price)}
-                                </TableCell>
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
-                                      >
-                                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => handleDownloadPdf(n.nota_id)}
-                                      >
-                                        Download PDF
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        variant="destructive"
-                                        onClick={() => setDeleteNotaId(n.nota_id)}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-</div>
-
-<div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
-                        <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[130px] pl-3 font-bold">Payment ID</TableHead>
-                              <TableHead className="w-[85px] font-bold">Date</TableHead>
-                              <TableHead className="w-[110px] font-bold">Method</TableHead>
-                              <TableHead className="w-[130px] text-right font-bold">Amount</TableHead>
-                              <TableHead className="w-[75px] font-bold">Evidence</TableHead>
-                              <TableHead className="font-bold">Notes</TableHead>
-                              <TableHead className="w-10" />
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {!modalPayments ? (
-                              <TableRow>
-                                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                                  Loading payments…
-                                </TableCell>
-                              </TableRow>
-                            ) : modalPayments.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                                  No Payment Yet
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              modalPayments.map((payment) => (
-                                <TableRow
-                                  key={payment.payment_id}
-                                  className="cursor-pointer hover:bg-accent/50"
-                                  onClick={() => handleSeePaymentPdf(company, payment)}
-                                >
-                                  <TableCell className="whitespace-nowrap pl-3">
-                                    {payment.payment_number ?? payment.payment_id}
-                                  </TableCell>
-                                  <TableCell className="whitespace-nowrap">{payment.payment_date}</TableCell>
-                                  <TableCell className="whitespace-nowrap">{payment.method}</TableCell>
-                                  <TableCell className="whitespace-nowrap text-right">
-                                    {formatRupiah(payment.amount)}
-                                  </TableCell>
-                                  <TableCell onClick={(e) => e.stopPropagation()}>
-                                    {payment.evidence_key ? (
-                                      <a
-                                        href={getPaymentEvidenceUrl(payment.payment_id)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-primary underline"
-                                      >
-                                        View
-                                      </a>
-                                    ) : (
-                                      '-'
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="whitespace-normal break-words">
-                                    {payment.reference ?? '-'}
-                                  </TableCell>
-                                  <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
-                                        >
-                                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                          onClick={() => handleDownloadPaymentPdf(company, payment)}
-                                        >
-                                          Download PDF
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          variant="destructive"
-                                          onClick={() =>
-                                            setDeletePayment({ company: company.company, payment })
-                                          }
-                                        >
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                        </div>
-                </div>
-              </>
-            )
-          })(modalCompany)}
-        </DialogContent>
-      </Dialog>
-
+  const sharedDialogs = (
+    <>
       <AlertDialog open={deleteNotaId !== null} onOpenChange={(open) => !open && setDeleteNotaId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -791,6 +424,464 @@ export function CompanyOverviewView({
           onCreated={() => handlePaymentCreated(paymentDialogCompany)}
         />
       )}
+    </>
+  )
+
+  if (modalCompany) {
+    const company = modalCompany
+    const settled = company.totalUnpaid <= 0
+    const totalCost = company.nota.reduce((sum, n) => sum + n.total_cost, 0)
+    const totalProfit = company.totalBill - totalCost
+    return (
+      <div className="space-y-4 pb-[40vh]">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setOpenCompany(null)}
+          className="w-fit rounded-full"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+
+        <h1 className="text-center text-2xl font-bold">
+          {company.company} - {monthLabel}
+        </h1>
+
+        <div className="grid grid-cols-5 gap-3">
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Total Nota</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums">{company.notaCount}</p>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Total Bill</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(company.totalBill)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Total Cost</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(totalCost)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Total Profit</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(totalProfit)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card size="sm" className={settled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+            <CardContent>
+              <p className={`text-xs ${settled ? 'text-green-800' : 'text-red-800'}`}>Total Paid</p>
+              <p
+                className={`text-[22px] leading-tight font-semibold tabular-nums break-all ${settled ? 'text-green-700' : 'text-red-700'}`}
+              >
+                {formatRupiah(company.totalPaid)}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="default" onClick={() => handlePrintBill(company)}>
+            Print Bill
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              setPaymentDialogCompany(company.company)
+              setPaymentDialogCustomerId(company.nota[0].customer_id)
+              setPaymentDialogDefaultAmount(company.totalUnpaid)
+            }}
+          >
+            Add Payment
+          </Button>
+        </div>
+        <div className="flex flex-col gap-4">
+          <h2 className="text-sm font-bold">Nota</h2>
+          <div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
+            <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
+              <colgroup>
+                <col className="w-[130px]" />
+                <col className="w-[85px]" />
+                <col className="w-[100px]" />
+                <col className="w-[100px]" />
+                <col className="w-[100px]" />
+                <col />
+                <col className="w-10" />
+              </colgroup>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-3 font-bold">Nota Number</TableHead>
+                  <TableHead className="font-bold">Date</TableHead>
+                  <TableHead className="text-right font-bold">Total</TableHead>
+                  <TableHead className="text-right font-bold">Cost</TableHead>
+                  <TableHead className="text-right font-bold">Profit</TableHead>
+                  <TableHead className="font-bold">Notes</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {company.nota.map((n) => (
+                  <TableRow
+                    key={n.nota_id}
+                    className="h-9 cursor-pointer hover:bg-accent/50"
+                    onClick={() => onSelectNota(n.nota_id)}
+                  >
+                    <TableCell className="whitespace-nowrap pl-3">{n.nota_number}</TableCell>
+                    <TableCell className="whitespace-nowrap">{n.nota_date}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      {formatRupiah(n.total_price)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      {formatRupiah(n.total_cost)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      {formatRupiah(n.total_price - n.total_cost)}
+                    </TableCell>
+                    <TableCell className="whitespace-normal break-words">{n.notes ?? '-'}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
+                          >
+                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDownloadPdf(n.nota_id)}>
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteNotaId(n.nota_id)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <h2 className="text-sm font-bold">Payment</h2>
+          <div className="h-[50vh] overflow-y-auto rounded-md border border-[oklch(0.84_0_0)] bg-panel [&_tr]:border-[oklch(0.86_0_0)]">
+            <Table className="w-full table-fixed text-xs [&_th]:h-8 [&_td]:py-1.5">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[130px] pl-3 font-bold">Payment ID</TableHead>
+                  <TableHead className="w-[85px] font-bold">Date</TableHead>
+                  <TableHead className="w-[110px] font-bold">Method</TableHead>
+                  <TableHead className="w-[130px] text-right font-bold">Amount</TableHead>
+                  <TableHead className="w-[75px] font-bold">Evidence</TableHead>
+                  <TableHead className="font-bold">Notes</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!modalPayments ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      Loading payments…
+                    </TableCell>
+                  </TableRow>
+                ) : modalPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      No Payment Yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  modalPayments.map((payment) => (
+                    <TableRow
+                      key={payment.payment_id}
+                      className="cursor-pointer hover:bg-accent/50"
+                      onClick={() => handleSeePaymentPdf(company, payment)}
+                    >
+                      <TableCell className="whitespace-nowrap pl-3">
+                        {payment.payment_number ?? payment.payment_id}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{payment.payment_date}</TableCell>
+                      <TableCell className="whitespace-nowrap">{payment.method}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right">
+                        {formatRupiah(payment.amount)}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {payment.evidence_key ? (
+                          <a
+                            href={getPaymentEvidenceUrl(payment.payment_id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary underline"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words">
+                        {payment.reference ?? '-'}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
+                            >
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownloadPaymentPdf(company, payment)}>
+                              Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setDeletePayment({ company: company.company, payment })}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {sharedDialogs}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 pb-[40vh]">
+      <div className="flex items-center justify-center gap-6 rounded-lg border border-[oklch(0.8_0_0)] bg-panel py-4">
+        <Button
+          type="button"
+          variant="default"
+          size="icon"
+          onClick={() => shiftMonth(-1)}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <span className="w-56 text-center text-2xl font-bold">{monthLabel}</span>
+        <Button
+          type="button"
+          variant="default"
+          size="icon"
+          onClick={() => shiftMonth(1)}
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-5 gap-3">
+        <Card size="sm">
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Total Nota</p>
+            <p className="text-[22px] leading-tight font-semibold tabular-nums">{totals.notaCount}</p>
+            <p className="text-xs text-muted-foreground">
+              From {allCompanies.length} Customer
+            </p>
+          </CardContent>
+        </Card>
+        <Card size="sm">
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Total Bill</p>
+            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+              {formatRupiah(totals.totalBill)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card size="sm">
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Profit</p>
+            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+              {formatRupiah(totalProfit)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Cost: {formatRupiah(totalCost)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="border-green-200 bg-green-50">
+          <CardContent>
+            <p className="text-xs text-green-800">Total Paid</p>
+            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-green-700">
+              {formatRupiah(totals.totalPaid)}
+            </p>
+            <p className="text-xs text-green-700">{settledCompanyCount} Customer Settled</p>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="border-red-200 bg-red-50">
+          <CardContent>
+            <p className="text-xs text-red-800">Total Unpaid</p>
+            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-red-700">
+              {formatRupiah(totals.totalUnpaid)}
+            </p>
+            <p className="text-xs text-red-700">{unsettledCompanyCount} Customer Unsettled</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search customer or contact name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-80"
+          />
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="partial">Partially Paid</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || status !== 'all') && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setStatus('all')
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        <Button onClick={onAddNota}>+ Add Nota</Button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
+          <Table className="table-fixed text-sm font-normal [&_td]:py-2">
+            <colgroup>
+              <col className="w-40" />
+              <col className="w-16" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-44" />
+            </colgroup>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Cost</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Profit</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Unpaid</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Paid</TableHead>
+                <TableHead className="h-12 bg-panel font-bold">Status</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {companies.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    No nota found for {monthLabel}.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                companies.map((company) => {
+                const companyState = companyStatus(company)
+                const companyCost = company.nota.reduce((sum, n) => sum + n.total_cost, 0)
+                return (
+                  <Fragment key={company.company}>
+                    <TableRow
+                      className="h-9 cursor-pointer font-normal bg-panel hover:bg-accent/40"
+                      onClick={() => toggleCompany(company)}
+                    >
+                      <TableCell className="truncate pl-2" title={company.company}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{company.company}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{company.notaCount}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(company.totalBill)}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(companyCost)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatRupiah(company.totalBill - companyCost)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatRupiah(company.totalUnpaid)}
+                      </TableCell>
+                      <TableCell className="text-right">{formatRupiah(company.totalPaid)}</TableCell>
+                      <TableCell>
+                        <span className={statusPillClass(companyState)}>{statusLabel(companyState)}</span>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            className="shadow-xs"
+                            onClick={() => handlePrintBill(company)}
+                          >
+                            Print Bill
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            className="shadow-xs"
+                            onClick={() => {
+                              setPaymentDialogCompany(company.company)
+                              setPaymentDialogCustomerId(company.nota[0].customer_id)
+                              setPaymentDialogDefaultAmount(company.totalUnpaid)
+                            }}
+                          >
+                            Add Payment
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </Fragment>
+                )
+              })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {sharedDialogs}
     </div>
   )
 }

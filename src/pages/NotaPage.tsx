@@ -69,6 +69,7 @@ export function NotaPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [view, setView] = useState<'list' | 'create'>('list')
+  const [companyDetailOpen, setCompanyDetailOpen] = useState(false)
   const [selectedNotaId, setSelectedNotaId] = useState<number | null>(null)
   const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
   const [paymentsByNota, setPaymentsByNota] = useState<Record<number, Payment[]>>({})
@@ -199,13 +200,19 @@ export function NotaPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Nota</h1>
 
       <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Monthly Overview</TabsTrigger>
-          <TabsTrigger value="nota">Nota View</TabsTrigger>
-        </TabsList>
+        {!companyDetailOpen && (
+          <TabsList>
+            <TabsTrigger value="overview">Monthly Overview</TabsTrigger>
+            <TabsTrigger value="nota">Nota View</TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent value="overview">
-          <CompanyOverviewView onAddNota={() => setView('create')} onSelectNota={setSelectedNotaId} />
+          <CompanyOverviewView
+            onAddNota={() => setView('create')}
+            onSelectNota={setSelectedNotaId}
+            onDetailOpenChange={setCompanyDetailOpen}
+          />
         </TabsContent>
 
         <TabsContent value="nota" className="space-y-4">
@@ -273,6 +280,8 @@ export function NotaPage() {
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead className="text-right">Total Bill</TableHead>
+            <TableHead className="text-right">Cost</TableHead>
+            <TableHead className="text-right">Profit</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="w-8" />
           </TableRow>
@@ -280,13 +289,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -305,6 +314,10 @@ export function NotaPage() {
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
                     <TableCell>{n.contact_name_snapshot}</TableCell>
                     <TableCell className="text-right">{formatRupiah(n.total_price)}</TableCell>
+                    <TableCell className="text-right">{formatRupiah(n.total_cost)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatRupiah(n.total_price - n.total_cost)}
+                    </TableCell>
                     <TableCell>
                       <span className={statusPillClass(n.status)}>{statusLabel(n.status)}</span>
                     </TableCell>

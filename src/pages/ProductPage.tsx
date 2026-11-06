@@ -34,7 +34,14 @@ import type { Product } from '@/lib/products'
 import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
 import { useSort } from '@/lib/useSort'
 
-type ProductSortKey = 'sku_id' | 'sku_name' | 'suggested_price' | 'total_revenue'
+type ProductSortKey =
+  | 'sku_id'
+  | 'sku_name'
+  | 'suggested_price'
+  | 'cost_price'
+  | 'profit_per_unit'
+  | 'margin'
+  | 'total_profit'
 
 export function ProductPage() {
   const { data: products = [], isLoading: loading } = useProductsQuery()
@@ -58,7 +65,15 @@ export function ProductPage() {
 
   const filteredProducts = applySort(
     products.filter((p) => p.sku_name.toLowerCase().includes(search.trim().toLowerCase())),
-    (row, key) => (key === 'suggested_price' ? row.suggested_price ?? 0 : row[key]),
+    (row, key) => {
+      if (key === 'suggested_price') return row.suggested_price ?? 0
+      if (key === 'cost_price') return row.cost_price ?? 0
+      if (key === 'profit_per_unit') return (row.suggested_price ?? 0) - (row.cost_price ?? 0)
+      if (key === 'margin')
+        return row.suggested_price ? ((row.suggested_price - (row.cost_price ?? 0)) / row.suggested_price) : 0
+      if (key === 'total_profit') return row.total_revenue - row.total_cost
+      return row[key]
+    },
   )
 
   return (
@@ -100,12 +115,36 @@ export function ProductPage() {
               Suggested Price / Unit
             </SortableTableHead>
             <SortableTableHead
-              active={sortKey === 'total_revenue'}
+              active={sortKey === 'cost_price'}
               dir={sortDir}
-              onClick={() => toggle('total_revenue')}
+              onClick={() => toggle('cost_price')}
+              className="w-32 text-left"
+            >
+              Cost
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'profit_per_unit'}
+              dir={sortDir}
+              onClick={() => toggle('profit_per_unit')}
+              className="w-32 text-left"
+            >
+              Profit
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'margin'}
+              dir={sortDir}
+              onClick={() => toggle('margin')}
+              className="w-32 text-left"
+            >
+              Margin
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'total_profit'}
+              dir={sortDir}
+              onClick={() => toggle('total_profit')}
               className="text-left"
             >
-              Total Revenue
+              Total Profit
             </SortableTableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -113,13 +152,13 @@ export function ProductPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredProducts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
                 {search ? 'No matching products.' : 'No products yet.'}
               </TableCell>
             </TableRow>
@@ -133,8 +172,19 @@ export function ProductPage() {
                     ? `${formatRupiah(product.suggested_price)} / ${product.unit}`
                     : `- / ${product.unit}`}
                 </TableCell>
+                <TableCell>
+                  {product.cost_price != null ? formatRupiah(product.cost_price) : '-'}
+                </TableCell>
+                <TableCell>
+                  {product.suggested_price != null && product.cost_price != null
+                    ? formatRupiah(product.suggested_price - product.cost_price)
+                    : '-'}
+                </TableCell>
+                <TableCell>
+                  {product.suggested_price ? `${Math.round(((product.suggested_price - (product.cost_price ?? 0)) / product.suggested_price) * 100)}%` : '-'}
+                </TableCell>
                 <TableCell className="text-[#3EA768] font-medium">
-                  {formatRupiah(product.total_revenue)}
+                  {formatRupiah(product.total_revenue - product.total_cost)}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

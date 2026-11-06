@@ -50,8 +50,8 @@ export function CustomerDialog({
       const input = {
         company_name: companyName.trim(),
         address: address.trim() || null,
-        contact_person: contactName.trim(),
-        phone_number: phoneNumber.trim(),
+        contact_person: contactName.trim() || null,
+        phone_number: phoneNumber.trim() || null,
       }
       const saved = customer
         ? await updateMutation.mutateAsync({ customerId: customer.customer_id, input })
@@ -101,7 +101,6 @@ export function CustomerDialog({
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               maxLength={60}
-              required
             />
           </div>
           <div className="space-y-2">
@@ -113,7 +112,6 @@ export function CustomerDialog({
               inputMode="numeric"
               onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
               maxLength={15}
-              required
             />
           </div>
           {error && <p className="text-destructive text-sm">{error}</p>}

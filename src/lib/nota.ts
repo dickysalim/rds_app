@@ -12,6 +12,8 @@ export interface NotaListItem {
   customer_company_name_snapshot: string
   contact_name_snapshot: string
   total_price: number
+  total_cost: number
+  notes: string | null
   paid_amount: number
   status: string
 }
@@ -116,6 +118,7 @@ export interface NotaInput {
   company_address: string | null
   contact_name: string
   phone_number: string
+  notes?: string | null
   items: NotaItemInput[]
 }
 
@@ -139,6 +142,7 @@ export interface NotaDetailItem {
   discount_amount: number
   discount_percent: number
   total_price: number
+  cost_price_snapshot: number | null
 }
 
 export interface NotaDetail {
@@ -152,6 +156,7 @@ export interface NotaDetail {
   total_price: number
   paid_amount: number
   status: string
+  notes: string | null
   items: NotaDetailItem[]
 }
 

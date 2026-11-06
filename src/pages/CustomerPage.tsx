@@ -40,7 +40,7 @@ type CustomerSortKey =
   | 'address'
   | 'contact_person'
   | 'phone_number'
-  | 'total_revenue'
+  | 'total_profit'
 
 export function CustomerPage() {
   const { data: customers = [], isLoading: loading } = useCustomersQuery()
@@ -76,7 +76,7 @@ export function CustomerPage() {
         (c.phone_number ?? '').toLowerCase().includes(q)
       )
     }),
-    (row, key) => row[key] ?? '',
+    (row, key) => (key === 'total_profit' ? row.total_revenue - row.total_cost : (row[key] ?? '')),
   )
 
   return (
@@ -123,12 +123,12 @@ export function CustomerPage() {
               Phone
             </SortableTableHead>
             <SortableTableHead
-              active={sortKey === 'total_revenue'}
+              active={sortKey === 'total_profit'}
               dir={sortDir}
-              onClick={() => toggle('total_revenue')}
+              onClick={() => toggle('total_profit')}
               className="text-left"
             >
-              Total Revenue
+              Total Profit
             </SortableTableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -155,7 +155,7 @@ export function CustomerPage() {
                   <TableCell>{customer.contact_person ?? '-'}</TableCell>
                   <TableCell>{customer.phone_number ?? '-'}</TableCell>
                   <TableCell className="text-[#3EA768] font-medium">
-                    {formatRupiah(customer.total_revenue)}
+                    {formatRupiah(customer.total_revenue - customer.total_cost)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
