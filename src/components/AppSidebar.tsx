@@ -1,4 +1,4 @@
-import { Receipt, Users, Package, Settings } from 'lucide-react'
+import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, FileBarChart, FilePlus, UserCog, UsersRound } from 'lucide-react'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -20,12 +20,53 @@ import type { AuthUser } from '@/lib/auth'
 import { useNavGuard } from '@/lib/nav-guard'
 import { useBusinessQuery } from '@/lib/queries'
 
-const items = [
+const operationItems = [
   { title: 'Nota', url: '/nota', icon: Receipt },
+  { title: 'Stock Management', url: '/stock-management', icon: Boxes },
   { title: 'Customer', url: '/customer', icon: Users },
   { title: 'Product', url: '/product', icon: Package },
-  { title: 'Business Settings', url: '/business-settings', icon: Settings },
 ]
+
+const financeItems = [
+  { title: 'Revenue', url: '/revenue', icon: TrendingUp },
+  { title: 'Expense', url: '/expense', icon: TrendingDown },
+  { title: 'Request Expense', url: '/request-expense', icon: FilePlus },
+  { title: 'Report', url: '/report', icon: FileBarChart },
+]
+
+const settingsItems = [
+  { title: 'Business Settings', url: '/business-settings', icon: Settings },
+  { title: 'Account Settings', url: '/account-settings', icon: UserCog },
+  { title: 'Team Settings', url: '/team-settings', icon: UsersRound },
+]
+
+function renderItem(
+  item: { title: string; url: string; icon: typeof Receipt },
+  location: ReturnType<typeof useLocation>,
+  guardRef: ReturnType<typeof useNavGuard>['guardRef'],
+  navigate: ReturnType<typeof useNavigate>,
+) {
+  const isActive =
+    item.url === '/' ? location.pathname === '/' : location.pathname.startsWith(item.url)
+  return (
+    <SidebarMenuItem key={item.title}>
+      <SidebarMenuButton asChild isActive={isActive}>
+        <NavLink
+          to={item.url}
+          onClick={(e) => {
+            if (guardRef.current) {
+              e.preventDefault()
+              guardRef.current(() => navigate(item.url))
+            }
+          }}
+        >
+          <item.icon />
+          <span>{item.title}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
 
 export function AppSidebar({
   user,
@@ -66,33 +107,26 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>Operation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => {
-                const isActive =
-                  item.url === '/'
-                    ? location.pathname === '/'
-                    : location.pathname.startsWith(item.url)
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <NavLink
-                        to={item.url}
-                        onClick={(e) => {
-                          if (guardRef.current) {
-                            e.preventDefault()
-                            guardRef.current(() => navigate(item.url))
-                          }
-                        }}
-                      >
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
+              {operationItems.map((item) => renderItem(item, location, guardRef, navigate))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Finance</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {financeItems.map((item) => renderItem(item, location, guardRef, navigate))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Utility</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {settingsItems.map((item) => renderItem(item, location, guardRef, navigate))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

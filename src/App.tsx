@@ -6,6 +6,7 @@ import { NotaPage } from '@/pages/NotaPage'
 import { CustomerPage } from '@/pages/CustomerPage'
 import { ProductPage } from '@/pages/ProductPage'
 import { BusinessSettingsPage } from '@/pages/BusinessSettingsPage'
+import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { PdfPreviewPage } from '@/pages/dev/PdfPreviewPage'
 import { fetchCurrentUser, logout, type AuthUser } from '@/lib/auth'
 import { getToken } from '@/lib/api'
@@ -51,9 +52,16 @@ function App() {
         >
           <Route path="/" element={<Navigate to="/nota" replace />} />
           <Route path="/nota" element={<NotaPageRoute />} />
+          <Route path="/stock-management" element={<ComingSoonPage title="Stock Management" />} />
           <Route path="/customer" element={<CustomerPage />} />
           <Route path="/product" element={<ProductPage />} />
+          <Route path="/revenue" element={<ComingSoonPage title="Revenue" />} />
+          <Route path="/expense" element={<ComingSoonPage title="Expense" />} />
+          <Route path="/request-expense" element={<ComingSoonPage title="Request Expense" />} />
+          <Route path="/report" element={<ComingSoonPage title="Report" />} />
           <Route path="/business-settings" element={<BusinessSettingsPage />} />
+          <Route path="/account-settings" element={<ComingSoonPage title="Account Settings" />} />
+          <Route path="/team-settings" element={<ComingSoonPage title="Team Settings" />} />
           {import.meta.env.DEV && <Route path="/dev/pdf-preview" element={<PdfPreviewPage />} />}
         </Route>
       </Routes>
