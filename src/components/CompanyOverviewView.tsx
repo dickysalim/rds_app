@@ -40,7 +40,7 @@ import {
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { previewBillPdfUrl } from '@/lib/billPdf'
 import { formatRupiah } from '@/lib/currency'
-import { getNota, getPaymentEvidenceUrl, listBillPayments, statusLabel, statusPillClass, sumTotals, voidPayment, type NotaListItem, type Payment, type Totals } from '@/lib/nota'
+import { getNota, getPaymentEvidenceUrl, listBillPayments, pajakCostOf, statusLabel, statusPillClass, sumTotals, totalBillOf, voidPayment, type NotaListItem, type Payment, type Totals } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { downloadPaymentPdf, previewPaymentPdfUrl } from '@/lib/paymentPdf'
 import {
@@ -334,6 +334,7 @@ export function CompanyOverviewView({
 
   const sharedDialogs = (
     <>
+
       <AlertDialog open={deleteNotaId !== null} onOpenChange={(open) => !open && setDeleteNotaId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -515,6 +516,9 @@ export function CompanyOverviewView({
                 <col className="w-[130px]" />
                 <col className="w-[85px]" />
                 <col className="w-[100px]" />
+                <col className="w-[120px]" />
+                <col className="w-[100px]" />
+                <col className="w-[100px]" />
                 <col className="w-[100px]" />
                 <col className="w-[100px]" />
                 <col />
@@ -524,7 +528,10 @@ export function CompanyOverviewView({
                 <TableRow>
                   <TableHead className="pl-3 font-bold">Nota Number</TableHead>
                   <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="text-right font-bold">Total</TableHead>
+                  <TableHead className="text-right font-bold">Sub Total</TableHead>
+                  <TableHead className="font-bold">Pajak Name</TableHead>
+                  <TableHead className="text-right font-bold">Pajak Cost</TableHead>
+                  <TableHead className="text-right font-bold">Total Bill</TableHead>
                   <TableHead className="text-right font-bold">Cost</TableHead>
                   <TableHead className="text-right font-bold">Profit</TableHead>
                   <TableHead className="font-bold">Notes</TableHead>
@@ -542,6 +549,15 @@ export function CompanyOverviewView({
                     <TableCell className="whitespace-nowrap">{n.nota_date}</TableCell>
                     <TableCell className="whitespace-nowrap text-right">
                       {formatRupiah(n.total_price)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {n.pajak_name ? `${n.pajak_name} (${n.pajak_percentage}%)` : '-'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      {formatRupiah(pajakCostOf(n))}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      {formatRupiah(totalBillOf(n))}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-right">
                       {formatRupiah(n.total_cost)}
@@ -795,12 +811,15 @@ export function CompanyOverviewView({
               <col className="w-24" />
               <col className="w-24" />
               <col className="w-24" />
+              <col className="w-24" />
               <col className="w-44" />
             </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Sub Total</TableHead>
+                <TableHead className="h-12 bg-panel text-right font-bold">Pajak Cost</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Cost</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Profit</TableHead>
@@ -813,7 +832,7 @@ export function CompanyOverviewView({
             <TableBody>
               {companies.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                     No nota found for {monthLabel}.
                   </TableCell>
                 </TableRow>
@@ -821,6 +840,7 @@ export function CompanyOverviewView({
                 companies.map((company) => {
                 const companyState = companyStatus(company)
                 const companyCost = company.nota.reduce((sum, n) => sum + n.total_cost, 0)
+                const companyPajakCost = company.nota.reduce((sum, n) => sum + pajakCostOf(n), 0)
                 return (
                   <Fragment key={company.company}>
                     <TableRow
@@ -834,6 +854,10 @@ export function CompanyOverviewView({
                       </TableCell>
                       <TableCell className="text-right">{company.notaCount}</TableCell>
                       <TableCell className="text-right">{formatRupiah(company.totalBill)}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(companyPajakCost)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatRupiah(company.totalBill + companyPajakCost)}
+                      </TableCell>
                       <TableCell className="text-right">{formatRupiah(companyCost)}</TableCell>
                       <TableCell className="text-right">
                         {formatRupiah(company.totalBill - companyCost)}

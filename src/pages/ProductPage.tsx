@@ -26,10 +26,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AdjustStockDialog } from '@/components/AdjustStockDialog'
 import { ProductDialog } from '@/components/ProductDialog'
 import { ProductHistoryDialog } from '@/components/ProductHistoryDialog'
 import { SortableTableHead } from '@/components/SortableTableHead'
-import { formatRupiah } from '@/lib/currency'
+import { formatQty, formatRupiah } from '@/lib/currency'
 import type { Product } from '@/lib/products'
 import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
 import { useSort } from '@/lib/useSort'
@@ -42,6 +43,7 @@ type ProductSortKey =
   | 'profit_per_unit'
   | 'margin'
   | 'total_profit'
+  | 'current_stock'
 
 export function ProductPage() {
   const { data: products = [], isLoading: loading } = useProductsQuery()
@@ -50,6 +52,7 @@ export function ProductPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
+  const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
   const { sortKey, sortDir, toggle, applySort } = useSort<Product, ProductSortKey>('sku_id', 'desc')
 
@@ -72,6 +75,7 @@ export function ProductPage() {
       if (key === 'margin')
         return row.suggested_price ? ((row.suggested_price - (row.cost_price ?? 0)) / row.suggested_price) : 0
       if (key === 'total_profit') return row.total_revenue - row.total_cost
+      if (key === 'current_stock') return row.current_stock ?? 0
       return row[key]
     },
   )
@@ -105,6 +109,14 @@ export function ProductPage() {
             </SortableTableHead>
             <SortableTableHead active={sortKey === 'sku_name'} dir={sortDir} onClick={() => toggle('sku_name')}>
               SKU Name
+            </SortableTableHead>
+            <SortableTableHead
+              active={sortKey === 'current_stock'}
+              dir={sortDir}
+              onClick={() => toggle('current_stock')}
+              className="w-24 text-left"
+            >
+              Stock
             </SortableTableHead>
             <SortableTableHead
               active={sortKey === 'suggested_price'}
@@ -152,13 +164,13 @@ export function ProductPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredProducts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 {search ? 'No matching products.' : 'No products yet.'}
               </TableCell>
             </TableRow>
@@ -167,6 +179,7 @@ export function ProductPage() {
               <TableRow key={product.sku_id}>
                 <TableCell>{String(product.sku_id).padStart(3, '0')}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>
+                <TableCell>{product.current_stock != null ? formatQty(product.current_stock) : '-'}</TableCell>
                 <TableCell>
                   {product.suggested_price != null
                     ? `${formatRupiah(product.suggested_price)} / ${product.unit}`
@@ -205,6 +218,9 @@ export function ProductPage() {
                       <DropdownMenuItem onClick={() => setHistoryProduct(product)}>
                         History
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setAdjustingProduct(product)}>
+                        Adjust Stock
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={() => setDeletingProduct(product)}
@@ -233,6 +249,12 @@ export function ProductPage() {
         onOpenChange={(open) => !open && setHistoryProduct(null)}
         skuId={historyProduct?.sku_id ?? null}
         skuName={historyProduct?.sku_name ?? null}
+      />
+
+      <AdjustStockDialog
+        open={!!adjustingProduct}
+        onOpenChange={(open) => !open && setAdjustingProduct(null)}
+        product={adjustingProduct}
       />
 
       <AlertDialog open={!!deletingProduct} onOpenChange={(open) => !open && setDeletingProduct(null)}>

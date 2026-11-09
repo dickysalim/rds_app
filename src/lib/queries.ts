@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
+  createBusinessAlias,
   getBusiness,
+  listBusinessAliases,
   updateBusiness,
+  updateBusinessAlias,
+  uploadBusinessAliasLogo,
   uploadBusinessLogo,
   type Business,
   type BusinessInput,
@@ -23,12 +27,15 @@ import {
   listBillPayments,
   listNota,
   voidNota,
+  updateNota,
+  type NotaUpdateInput,
   type NotaInput,
   type PaymentInput,
 } from '@/lib/nota'
 import { clearAllNotaPdfCaches, invalidateNotaPdfCache } from '@/lib/notaPdf'
 import { clearPaymentPdfCache } from '@/lib/paymentPdf'
 import { createProduct, deleteProduct, listProducts, updateProduct, type ProductInput } from '@/lib/products'
+import { createStockMovement, listStockLedger, type StockMovementInput } from '@/lib/stockLedger'
 
 // Logo or business details changed — every cached PDF (client-side and the
 // server-side R2 nota cache) has the old letterhead baked in.
@@ -52,8 +59,10 @@ export function resetAllCachesForDbSwitch(queryClient: QueryClient) {
 // know each other's exact key shape.
 export const queryKeys = {
   business: ['business'] as const,
+  businessAliases: ['business', 'aliases'] as const,
   customers: ['customers'] as const,
   products: ['products'] as const,
+  stockLedger: ['stock-ledger'] as const,
   notaList: (params?: Record<string, unknown>) => ['nota', 'list', params ?? {}] as const,
   notaDetail: (notaId: number) => ['nota', 'detail', notaId] as const,
   notaDateRange: ['nota', 'date-range'] as const,
@@ -85,6 +94,42 @@ export function useUploadBusinessLogoMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.business })
       invalidateAllPdfCaches()
+    },
+  })
+}
+
+export function useBusinessAliasesQuery() {
+  return useQuery({ queryKey: queryKeys.businessAliases, queryFn: listBusinessAliases })
+}
+
+export function useCreateBusinessAliasMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: BusinessInput) => createBusinessAlias(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessAliases })
+    },
+  })
+}
+
+export function useUpdateBusinessAliasMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ businessId, input }: { businessId: number; input: BusinessInput }) =>
+      updateBusinessAlias(businessId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessAliases })
+    },
+  })
+}
+
+export function useUploadBusinessAliasLogoMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ businessId, blob }: { businessId: number; blob: Blob }) =>
+      uploadBusinessAliasLogo(businessId, blob),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessAliases })
     },
   })
 }
@@ -124,6 +169,23 @@ export function useDeleteCustomerMutation() {
 
 export function useProductsQuery() {
   return useQuery({ queryKey: queryKeys.products, queryFn: listProducts })
+}
+
+// --- Stock ledger -------------------------------------------------------
+
+export function useStockLedgerQuery() {
+  return useQuery({ queryKey: queryKeys.stockLedger, queryFn: listStockLedger })
+}
+
+export function useCreateStockMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: StockMovementInput) => createStockMovement(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stockLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+    },
+  })
 }
 
 export function useCreateProductMutation() {
@@ -188,6 +250,18 @@ export function useCreateNotaMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.notaDateRange })
       queryClient.invalidateQueries({ queryKey: queryKeys.products })
       queryClient.invalidateQueries({ queryKey: queryKeys.customers })
+    },
+  })
+}
+
+export function useUpdateNotaMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ notaId, input }: { notaId: number; input: NotaUpdateInput }) =>
+      updateNota(notaId, input),
+    onSuccess: (_data, { notaId }) => {
+      queryClient.invalidateQueries({ queryKey: ['nota', 'list'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notaDetail(notaId) })
     },
   })
 }

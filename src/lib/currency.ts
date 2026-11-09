@@ -7,3 +7,7 @@ export function formatRupiahInput(value: string): string {
 export function formatRupiah(amount: number): string {
   return `Rp${new Intl.NumberFormat('id-ID').format(amount)}`
 }
+
+export function formatQty(qty: number): string {
+  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(qty)
+}

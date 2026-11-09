@@ -10,6 +10,7 @@ export interface Product {
   updated_at: string
   total_revenue: number
   total_cost: number
+  current_stock: number | null
 }
 
 export async function listProducts(): Promise<Product[]> {

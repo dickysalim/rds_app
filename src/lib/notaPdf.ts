@@ -182,10 +182,28 @@ function renderNota(doc: jsPDF, nota: NotaDetail, business: Business, logo: stri
 
   const labelX = 140
   const valueX = CONTENT_RIGHT
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.text('TOTAL', labelX, finalY)
-  doc.text(fmt(nota.total_price), valueX, finalY, { align: 'right' })
+
+  if (nota.pajak_name && nota.pajak_percentage != null) {
+    const pajakValue = (nota.total_price * nota.pajak_percentage) / 100
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text('Subtotal', labelX, finalY)
+    doc.text(fmt(nota.total_price), valueX, finalY, { align: 'right' })
+    finalY += 6
+    doc.text(`${nota.pajak_name} (${nota.pajak_percentage}%)`, labelX, finalY)
+    doc.text(fmt(pajakValue), valueX, finalY, { align: 'right' })
+    finalY += 7
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text('TOTAL', labelX, finalY)
+    doc.text(fmt(nota.total_price + pajakValue), valueX, finalY, { align: 'right' })
+  } else {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text('TOTAL', labelX, finalY)
+    doc.text(fmt(nota.total_price), valueX, finalY, { align: 'right' })
+  }
 
   return finalY
 }

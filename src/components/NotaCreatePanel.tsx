@@ -16,11 +16,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import type { Customer } from '@/lib/customers'
-import { formatRupiah, formatRupiahInput } from '@/lib/currency'
+import { formatQty, formatRupiah, formatRupiahInput } from '@/lib/currency'
 import { useNavGuard } from '@/lib/nav-guard'
 import { UNITS, type NotaInput, type NotaListItem } from '@/lib/nota'
 import type { Product } from '@/lib/products'
 import {
+  useBusinessAliasesQuery,
+  useBusinessQuery,
   useCreateNotaMutation,
   useCustomersQuery,
   useProductsQuery,
@@ -29,6 +31,19 @@ import {
 
 function toNumber(formatted: string): number {
   return Number(formatted.replace(/\D/g, '')) || 0
+}
+
+export const PAJAK_NAME_OPTIONS = ['PPN', 'PPh 21', 'PPh 22', 'PPh 23', 'PPh 4(2)', 'PPh 25', 'PPh 29']
+
+// Usual rate for each tax name, prefilled on pick but still editable —
+// PPh 25/29 have no standard flat rate (installment/annual settlement), so
+// they're left blank for the user to fill in.
+export const PAJAK_DEFAULT_PERCENTAGE: Record<string, string> = {
+  PPN: '11',
+  'PPh 21': '5',
+  'PPh 22': '1.5',
+  'PPh 23': '2',
+  'PPh 4(2)': '10',
 }
 
 interface ItemRow {
@@ -68,9 +83,12 @@ export function NotaCreatePanel({
 }) {
   const { data: customers = [] } = useCustomersQuery()
   const { data: products = [] } = useProductsQuery()
+  const { data: business } = useBusinessQuery()
+  const { data: businessAliases = [] } = useBusinessAliasesQuery()
   const createNotaMutation = useCreateNotaMutation()
   const updateCustomerMutation = useUpdateCustomerMutation()
   const [notaDate, setNotaDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [issuerBusinessId, setIssuerBusinessId] = useState<number | null>(null)
   const [companyName, setCompanyName] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [contactPerson, setContactPerson] = useState('')
@@ -79,6 +97,9 @@ export function NotaCreatePanel({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
   const [companyHighlightedIndex, setCompanyHighlightedIndex] = useState(-1)
+  const [notes, setNotes] = useState('')
+  const [pajakName, setPajakName] = useState('')
+  const [pajakPercentage, setPajakPercentage] = useState('')
   const [items, setItems] = useState<ItemRow[]>([newRow()])
   const skuInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -108,7 +129,13 @@ export function NotaCreatePanel({
 
   useEffect(() => {
     setError(null)
-  }, [notaDate, companyName, companyAddress, contactPerson, phoneNumber, items])
+  }, [notaDate, companyName, companyAddress, contactPerson, phoneNumber, items, pajakName, pajakPercentage])
+
+  useEffect(() => {
+    if (issuerBusinessId === null && business) setIssuerBusinessId(business.business_id)
+  }, [business, issuerBusinessId])
+
+  const businessOptions = [...(business ? [business] : []), ...businessAliases]
 
   function updateItem(key: string, patch: Partial<ItemRow>) {
     setItems((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -152,16 +179,30 @@ export function NotaCreatePanel({
 
   const grandTotal = items.reduce((sum, row) => sum + subtotalOf(row), 0)
 
+  function exceedsStock(row: ItemRow): boolean {
+    if (row.skuId === null) return false
+    const product = products.find((p) => p.sku_id === row.skuId)
+    return product?.current_stock != null && Number(row.qty) > product.current_stock
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (!companyName.trim() || !contactPerson.trim() || !phoneNumber.trim()) {
-      setError('Company name, contact person and phone number are required')
+    if (!companyName.trim()) {
+      setError('Company name is required')
       return
     }
     if (items.length === 0 || items.some((row) => !row.skuQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a SKU name, unit and qty')
+      return
+    }
+    if (items.some(exceedsStock)) {
+      setError('An item quantity exceeds current stock')
+      return
+    }
+    if (!!pajakName !== !!pajakPercentage) {
+      setError('Pajak name and percentage must be filled together')
       return
     }
 
@@ -172,12 +213,20 @@ export function NotaCreatePanel({
     setConfirmSave(false)
     setError(null)
 
-    if (!companyName.trim() || !contactPerson.trim() || !phoneNumber.trim()) {
-      setError('Company name, contact person and phone number are required')
+    if (!companyName.trim()) {
+      setError('Company name is required')
       return
     }
     if (items.length === 0 || items.some((row) => !row.skuQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a SKU name, unit and qty')
+      return
+    }
+    if (items.some(exceedsStock)) {
+      setError('An item quantity exceeds current stock')
+      return
+    }
+    if (!!pajakName !== !!pajakPercentage) {
+      setError('Pajak name and percentage must be filled together')
       return
     }
 
@@ -185,8 +234,12 @@ export function NotaCreatePanel({
       nota_date: notaDate,
       company_name: companyName.trim(),
       company_address: companyAddress.trim() || null,
-      contact_name: contactPerson.trim(),
-      phone_number: phoneNumber.trim(),
+      contact_name: contactPerson.trim() || null,
+      phone_number: phoneNumber.trim() || null,
+      notes: notes.trim() || null,
+      business_id: issuerBusinessId,
+      pajak_name: pajakName || null,
+      pajak_percentage: pajakPercentage ? Number(pajakPercentage) : null,
       items: items.map((row) => ({
         sku_id: row.skuId,
         sku_name: row.skuQuery.trim(),
@@ -277,22 +330,99 @@ export function NotaCreatePanel({
           }
         }}
       >
-        <div className="grid w-full grid-cols-[9rem_1fr_9rem_1.6fr] items-center gap-x-8 gap-y-1.5">
-          <Label htmlFor="nota_date" className="text-right">
-            Date
-          </Label>
-          <Input
-            id="nota_date"
-            type="date"
-            value={notaDate}
-            onChange={(e) => setNotaDate(e.target.value)}
-            required
-          />
+        <div className="flex w-full gap-x-8">
+          <div className="grid flex-1 grid-cols-[9rem_1fr] items-center gap-x-8 gap-y-1.5">
+            <Label htmlFor="nota_date" className="text-right">
+              Date
+            </Label>
+            <Input
+              id="nota_date"
+              type="date"
+              value={notaDate}
+              onChange={(e) => setNotaDate(e.target.value)}
+              required
+            />
 
-          <Label htmlFor="company_name" className="text-right">
-            Company Name
-          </Label>
-          <div className="relative">
+            <Label htmlFor="alias" className="text-right">
+              Alias
+            </Label>
+            <Select
+              value={issuerBusinessId != null ? String(issuerBusinessId) : undefined}
+              onValueChange={(v) => setIssuerBusinessId(Number(v))}
+            >
+              <SelectTrigger id="alias" className="w-full">
+                <SelectValue placeholder="Select company identity" />
+              </SelectTrigger>
+              <SelectContent>
+                {businessOptions.map((b) => (
+                  <SelectItem key={b.business_id} value={String(b.business_id)}>
+                    {b.business_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Label htmlFor="notes" className="text-right">
+              Notes
+            </Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={200}
+            />
+
+            <Label htmlFor="pajak_name" className="text-right">
+              Pajak Name
+            </Label>
+            <Select
+              value={pajakName || 'none'}
+              onValueChange={(v) => {
+                if (v === 'none') {
+                  setPajakName('')
+                  setPajakPercentage('')
+                  return
+                }
+                setPajakName(v)
+                setPajakPercentage(PAJAK_DEFAULT_PERCENTAGE[v] ?? '')
+              }}
+            >
+              <SelectTrigger id="pajak_name" className="w-full">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {PAJAK_NAME_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Label htmlFor="pajak_percentage" className="text-right">
+              Pajak Percentage
+            </Label>
+            <div className="relative">
+              <Input
+                id="pajak_percentage"
+                inputMode="decimal"
+                className="pr-7"
+                value={pajakPercentage}
+                disabled={!pajakName}
+                onChange={(e) => setPajakPercentage(e.target.value.replace(/[^\d.]/g, ''))}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                %
+              </span>
+            </div>
+          </div>
+
+          <div className="grid flex-[1.6] grid-cols-[9rem_1fr] items-center gap-x-8 gap-y-1.5">
+            <Label htmlFor="company_name" className="text-right">
+              Customer Name
+            </Label>
+            <div className="relative">
             <Input
               id="company_name"
               value={companyName}
@@ -329,7 +459,7 @@ export function NotaCreatePanel({
                   setShowCustomerSuggestions(false)
                 }
               }}
-              placeholder="Type or pick a company name"
+              placeholder="Type or pick a customer name"
               autoComplete="off"
               required
             />
@@ -353,41 +483,41 @@ export function NotaCreatePanel({
             )}
           </div>
 
-          <Label htmlFor="contact_person" className="text-right">
-            Contact Person
-          </Label>
-          <Input
-            id="contact_person"
-            value={contactPerson}
-            onChange={(e) => setContactPerson(e.target.value)}
-            disabled={isExistingCustomer}
-            className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
-            required
-          />
-          <Label htmlFor="company_address" className="self-start pt-2 text-right">
-            Address
-          </Label>
-          <Textarea
-            id="company_address"
-            className="row-span-2 min-h-[4.5rem] disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
-            value={companyAddress}
-            onChange={(e) => setCompanyAddress(e.target.value)}
-            disabled={isExistingCustomer}
-          />
+            <Label htmlFor="contact_person" className="text-right">
+              Contact Person
+            </Label>
+            <Input
+              id="contact_person"
+              value={contactPerson}
+              onChange={(e) => setContactPerson(e.target.value)}
+              disabled={isExistingCustomer}
+              className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
+            />
 
-          <Label htmlFor="phone_number" className="text-right">
-            Phone Number
-          </Label>
-          <Input
-            id="phone_number"
-            type="tel"
-            inputMode="numeric"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-            disabled={isExistingCustomer}
-            className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
-            required
-          />
+            <Label htmlFor="phone_number" className="text-right">
+              Phone Number
+            </Label>
+            <Input
+              id="phone_number"
+              type="tel"
+              inputMode="numeric"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+              disabled={isExistingCustomer}
+              className="disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
+            />
+
+            <Label htmlFor="company_address" className="self-start pt-2 text-right">
+              Address
+            </Label>
+            <Textarea
+              id="company_address"
+              className="min-h-[4.5rem] disabled:bg-[oklch(0.9_0_0)] disabled:opacity-100"
+              value={companyAddress}
+              onChange={(e) => setCompanyAddress(e.target.value)}
+              disabled={isExistingCustomer}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -405,10 +535,19 @@ export function NotaCreatePanel({
 
           <div className="pt-2">
             {items.map((row) => {
-              const filteredProducts = products.filter((p) =>
-                p.sku_name.toLowerCase().includes(row.skuQuery.toLowerCase()),
-              ).slice(0, 5)
+              const usedSkuIds = new Set(
+                items.filter((r) => r.key !== row.key && r.skuId !== null).map((r) => r.skuId),
+              )
+              const filteredProducts = products
+                .filter(
+                  (p) =>
+                    p.sku_name.toLowerCase().includes(row.skuQuery.toLowerCase()) &&
+                    !usedSkuIds.has(p.sku_id),
+                )
+                .slice(0, 5)
               const lockedBySku = row.skuId !== null
+              const stockProduct = row.skuId !== null ? products.find((p) => p.sku_id === row.skuId) : undefined
+              const currentStock = stockProduct?.current_stock ?? null
               const cellInputClass =
                 'min-w-0 bg-white'
               return (
@@ -509,14 +648,23 @@ export function NotaCreatePanel({
                     ))}
                   </SelectContent>
                 </Select>
-                <Input
-                  className={cellInputClass}
-                  inputMode="numeric"
-                  value={row.qty}
-                  onChange={(e) =>
-                    updateItem(row.key, { qty: e.target.value.replace(/[^0-9.]/g, '') })
-                  }
-                />
+                <div className="min-w-0">
+                  <Input
+                    className={cellInputClass}
+                    inputMode="numeric"
+                    value={row.qty}
+                    onChange={(e) => {
+                      let qty = e.target.value.replace(/[^0-9.]/g, '')
+                      if (currentStock != null && Number(qty) > currentStock) {
+                        qty = String(currentStock)
+                      }
+                      updateItem(row.key, { qty })
+                    }}
+                  />
+                  {currentStock != null && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">Stock: {formatQty(currentStock)}</p>
+                  )}
+                </div>
                 <div className="relative min-w-0">
                   <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                     Rp
@@ -573,6 +721,8 @@ export function NotaCreatePanel({
 
         {error && <p className="text-destructive text-sm">{error}</p>}
       </form>
+
+      <div aria-hidden className="h-[50vh]" />
 
       <AlertDialog open={confirmBack} onOpenChange={setConfirmBack}>
         <AlertDialogContent>

@@ -10,12 +10,22 @@ export interface NotaListItem {
   nota_date: string
   customer_id: number
   customer_company_name_snapshot: string
-  contact_name_snapshot: string
+  contact_name_snapshot: string | null
   total_price: number
   total_cost: number
   notes: string | null
   paid_amount: number
   status: string
+  pajak_name: string | null
+  pajak_percentage: number | null
+}
+
+export function pajakCostOf(n: Pick<NotaListItem, 'total_price' | 'pajak_percentage'>): number {
+  return n.pajak_percentage != null ? (n.total_price * n.pajak_percentage) / 100 : 0
+}
+
+export function totalBillOf(n: Pick<NotaListItem, 'total_price' | 'pajak_percentage'>): number {
+  return n.total_price + pajakCostOf(n)
 }
 
 export interface Totals {
@@ -116,9 +126,12 @@ export interface NotaInput {
   nota_date: string
   company_name: string
   company_address: string | null
-  contact_name: string
-  phone_number: string
+  contact_name: string | null
+  phone_number: string | null
   notes?: string | null
+  business_id?: number | null
+  pajak_name?: string | null
+  pajak_percentage?: number | null
   items: NotaItemInput[]
 }
 
@@ -151,12 +164,15 @@ export interface NotaDetail {
   nota_date: string
   customer_company_name_snapshot: string
   customer_address_snapshot: string | null
-  contact_name_snapshot: string
-  contact_phone_number_snapshot: string
+  contact_name_snapshot: string | null
+  contact_phone_number_snapshot: string | null
   total_price: number
   paid_amount: number
   status: string
   notes: string | null
+  business_id: number | null
+  pajak_name: string | null
+  pajak_percentage: number | null
   items: NotaDetailItem[]
 }
 
@@ -165,6 +181,25 @@ export async function getNota(notaId: number): Promise<NotaDetail> {
   const data = (await res.json()) as { nota?: NotaDetail; error?: string }
   if (!res.ok || !data.nota) throw new Error(data.error ?? 'Failed to load nota')
   return data.nota
+}
+
+export interface NotaUpdateInput {
+  notes?: string | null
+  business_id?: number | null
+  pajak_name?: string | null
+  pajak_percentage?: number | null
+}
+
+export async function updateNota(notaId: number, input: NotaUpdateInput): Promise<void> {
+  const res = await apiFetch(`/nota/${notaId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error ?? 'Failed to update nota')
+  }
 }
 
 export async function voidNota(notaId: number): Promise<void> {

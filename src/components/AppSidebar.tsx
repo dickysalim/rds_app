@@ -1,4 +1,4 @@
-import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, FileBarChart, FilePlus, UserCog, UsersRound } from 'lucide-react'
+import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, FileBarChart, FilePlus, UserCog, UsersRound, Tag } from 'lucide-react'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -36,6 +36,7 @@ const financeItems = [
 
 const settingsItems = [
   { title: 'Business Settings', url: '/business-settings', icon: Settings },
+  { title: 'Alias', url: '/alias-settings', icon: Tag },
   { title: 'Account Settings', url: '/account-settings', icon: UserCog },
   { title: 'Team Settings', url: '/team-settings', icon: UsersRound },
 ]

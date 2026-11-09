@@ -47,8 +47,10 @@ import {
   getNota,
   getPaymentEvidenceUrl,
   listBillPayments,
+  pajakCostOf,
   statusLabel,
   statusPillClass,
+  totalBillOf,
   type NotaListItem,
   type Payment,
 } from '@/lib/nota'
@@ -279,6 +281,9 @@ export function NotaPage() {
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
+            <TableHead className="text-right">Sub Total</TableHead>
+            <TableHead>Pajak Name</TableHead>
+            <TableHead className="text-right">Pajak Cost</TableHead>
             <TableHead className="text-right">Total Bill</TableHead>
             <TableHead className="text-right">Cost</TableHead>
             <TableHead className="text-right">Profit</TableHead>
@@ -289,13 +294,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={12} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={12} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -312,8 +317,13 @@ export function NotaPage() {
                     <TableCell>{n.nota_number}</TableCell>
                     <TableCell>{n.nota_date}</TableCell>
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
-                    <TableCell>{n.contact_name_snapshot}</TableCell>
+                    <TableCell>{n.contact_name_snapshot ?? '-'}</TableCell>
                     <TableCell className="text-right">{formatRupiah(n.total_price)}</TableCell>
+                    <TableCell>
+                      {n.pajak_name ? `${n.pajak_name} (${n.pajak_percentage}%)` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">{formatRupiah(pajakCostOf(n))}</TableCell>
+                    <TableCell className="text-right">{formatRupiah(totalBillOf(n))}</TableCell>
                     <TableCell className="text-right">{formatRupiah(n.total_cost)}</TableCell>
                     <TableCell className="text-right">
                       {formatRupiah(n.total_price - n.total_cost)}
@@ -525,6 +535,7 @@ export function NotaPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }

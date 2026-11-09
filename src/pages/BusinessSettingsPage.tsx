@@ -289,9 +289,8 @@ export function BusinessSettingsPage() {
           <Label htmlFor="payment_account_number">Account Number</Label>
           <Input
             id="payment_account_number"
-            inputMode="numeric"
             value={paymentAccountNumber}
-            onChange={(e) => setPaymentAccountNumber(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => setPaymentAccountNumber(e.target.value)}
           />
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}

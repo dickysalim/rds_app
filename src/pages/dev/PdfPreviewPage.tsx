@@ -38,6 +38,9 @@ const MOCK_NOTA: NotaDetail = {
   paid_amount: 0,
   status: 'unpaid',
   notes: null,
+  business_id: null,
+  pajak_name: null,
+  pajak_percentage: null,
   items: MOCK_SKUS.map((sku, idx) => {
     const totalPrice = sku.qty * sku.price
     return {
