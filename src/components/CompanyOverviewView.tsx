@@ -515,12 +515,9 @@ export function CompanyOverviewView({
               <colgroup>
                 <col className="w-[130px]" />
                 <col className="w-[85px]" />
-                <col className="w-[100px]" />
-                <col className="w-[120px]" />
-                <col className="w-[100px]" />
-                <col className="w-[100px]" />
-                <col className="w-[100px]" />
-                <col className="w-[100px]" />
+                <col className="w-[110px]" />
+                <col className="w-[180px]" />
+                <col className="w-[110px]" />
                 <col />
                 <col className="w-10" />
               </colgroup>
@@ -528,9 +525,6 @@ export function CompanyOverviewView({
                 <TableRow>
                   <TableHead className="pl-3 font-bold">Nota Number</TableHead>
                   <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="text-right font-bold">Sub Total</TableHead>
-                  <TableHead className="font-bold">Pajak Name</TableHead>
-                  <TableHead className="text-right font-bold">Pajak Cost</TableHead>
                   <TableHead className="text-right font-bold">Total Bill</TableHead>
                   <TableHead className="text-right font-bold">Cost</TableHead>
                   <TableHead className="text-right font-bold">Profit</TableHead>
@@ -548,19 +542,17 @@ export function CompanyOverviewView({
                     <TableCell className="whitespace-nowrap pl-3">{n.nota_number}</TableCell>
                     <TableCell className="whitespace-nowrap">{n.nota_date}</TableCell>
                     <TableCell className="whitespace-nowrap text-right">
-                      {formatRupiah(n.total_price)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {n.pajak_name ? `${n.pajak_name} (${n.pajak_percentage}%)` : '-'}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right">
-                      {formatRupiah(pajakCostOf(n))}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right">
                       {formatRupiah(totalBillOf(n))}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-right">
-                      {formatRupiah(n.total_cost)}
+                    <TableCell className="whitespace-nowrap text-right leading-tight">
+                      <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                        <span>Cost</span>
+                        <span className="text-center">:</span>
+                        <span>{formatRupiah(n.total_cost)}</span>
+                        <span>Tax</span>
+                        <span className="text-center">:</span>
+                        <span>{formatRupiah(pajakCostOf(n))}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-right">
                       {formatRupiah(n.total_price - n.total_cost)}
@@ -852,8 +844,14 @@ export function CompanyOverviewView({
                         {formatRupiah(company.totalBill + companyPajakCost)}
                       </TableCell>
                       <TableCell className="text-right text-xs leading-tight">
-                        <div>Cost: {formatRupiah(companyCost)}</div>
-                        <div>Tax: {formatRupiah(companyPajakCost)}</div>
+                        <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                          <span>Cost</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(companyCost)}</span>
+                          <span>Tax</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(companyPajakCost)}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         {formatRupiah(company.totalBill - companyCost)}

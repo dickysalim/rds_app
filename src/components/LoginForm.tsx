@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, type AuthUser } from '@/lib/auth'
 
-export function LoginForm({ onLogin }: { onLogin: (user: AuthUser) => void }) {
+export function LoginForm({ onLogin }: { onLogin: (user: AuthUser, password: string) => void }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +23,7 @@ export function LoginForm({ onLogin }: { onLogin: (user: AuthUser) => void }) {
     setLoading(true)
     try {
       const user = await login(username.trim(), password)
-      onLogin(user)
+      onLogin(user, password)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {

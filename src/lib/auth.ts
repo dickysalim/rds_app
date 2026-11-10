@@ -1,10 +1,11 @@
 import { apiFetch, clearToken, setToken, setUsingStagingDb } from '@/lib/api'
 
 export interface AuthUser {
-  id: number
+  id: string
   username: string
   name: string
   role: string
+  must_change_password: boolean
 }
 
 interface LoginResponse {
@@ -37,7 +38,42 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
   return data.user
 }
 
+export async function updateAccountName(name: string): Promise<AuthUser> {
+  const res = await apiFetch('/auth/account', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  const data = (await res.json()) as LoginResponse | ErrorResponse
+  if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to update name')
+  setToken((data as LoginResponse).token)
+  return (data as LoginResponse).user
+}
+
+export async function updatePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
+  const res = await apiFetch('/auth/password', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  })
+  const data = (await res.json()) as LoginResponse | ErrorResponse
+  if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to update password')
+  setToken((data as LoginResponse).token)
+  return (data as LoginResponse).user
+}
+
 export function logout(): void {
   clearToken()
   setUsingStagingDb(false)
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: 'Super Admin',
+  owner: 'Owner',
+  staff: 'Staff',
+  quality_control: 'Quality Control',
+}
+
+export function roleLabel(role: string): string {
+  return ROLE_LABEL[role] ?? role
 }

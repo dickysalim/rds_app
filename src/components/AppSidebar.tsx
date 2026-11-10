@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { isUsingStagingDb } from '@/lib/api'
+import { isPathAllowed } from '@/lib/access'
 import type { AuthUser } from '@/lib/auth'
 import { useNavGuard } from '@/lib/nav-guard'
 import { useBusinessQuery } from '@/lib/queries'
@@ -81,6 +82,10 @@ export function AppSidebar({
   const { guardRef } = useNavGuard()
   const { data: business } = useBusinessQuery()
 
+  const visibleOperationItems = operationItems.filter((item) => isPathAllowed(user.role, item.url))
+  const visibleFinanceItems = financeItems.filter((item) => isPathAllowed(user.role, item.url))
+  const visibleSettingsItems = settingsItems.filter((item) => isPathAllowed(user.role, item.url))
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -107,30 +112,36 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Operation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {operationItems.map((item) => renderItem(item, location, guardRef, navigate))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Finance</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {financeItems.map((item) => renderItem(item, location, guardRef, navigate))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Utility</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {settingsItems.map((item) => renderItem(item, location, guardRef, navigate))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {visibleOperationItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Operation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleOperationItems.map((item) => renderItem(item, location, guardRef, navigate))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleFinanceItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Finance</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleFinanceItems.map((item) => renderItem(item, location, guardRef, navigate))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleSettingsItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Utility</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleSettingsItems.map((item) => renderItem(item, location, guardRef, navigate))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center justify-between gap-2 px-2 py-1.5">

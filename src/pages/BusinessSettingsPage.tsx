@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { isUsingStagingDb, setUsingStagingDb } from '@/lib/api'
-import type { AuthUser } from '@/lib/auth'
+import type { AppOutletContext } from '@/components/AppLayout'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { getCroppedImageBlob } from '@/lib/cropImage'
 import {
@@ -17,7 +17,7 @@ import {
 } from '@/lib/queries'
 
 export function BusinessSettingsPage() {
-  const user = useOutletContext<AuthUser>()
+  const { user } = useOutletContext<AppOutletContext>()
   const queryClient = useQueryClient()
   const { data: business, isLoading: loading } = useBusinessQuery()
   const updateMutation = useUpdateBusinessMutation()

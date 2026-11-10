@@ -8,6 +8,9 @@ import { ProductPage } from '@/pages/ProductPage'
 import { AliasEditPage } from '@/pages/AliasEditPage'
 import { AliasSettingsPage } from '@/pages/AliasSettingsPage'
 import { BusinessSettingsPage } from '@/pages/BusinessSettingsPage'
+import { AccountSettingsPage } from '@/pages/AccountSettingsPage'
+import { TeamSettingsPage } from '@/pages/TeamSettingsPage'
+import { ForcePasswordChangePage } from '@/pages/ForcePasswordChangePage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { StockManagementPage } from '@/pages/StockManagementPage'
 import { PdfPreviewPage } from '@/pages/dev/PdfPreviewPage'
@@ -22,6 +25,7 @@ function NotaPageRoute() {
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [checking, setChecking] = useState(true)
+  const [loginPassword, setLoginPassword] = useState<string | null>(null)
 
   useEffect(() => {
     if (!getToken()) {
@@ -36,7 +40,26 @@ function App() {
   if (checking) return null
 
   if (!user) {
-    return <LoginForm onLogin={setUser} />
+    return (
+      <LoginForm
+        onLogin={(loggedInUser, password) => {
+          setUser(loggedInUser)
+          setLoginPassword(password)
+        }}
+      />
+    )
+  }
+
+  if (user.must_change_password) {
+    return (
+      <ForcePasswordChangePage
+        knownCurrentPassword={loginPassword}
+        onDone={(updated) => {
+          setUser(updated)
+          setLoginPassword(null)
+        }}
+      />
+    )
   }
 
   return (
@@ -50,6 +73,7 @@ function App() {
                 logout()
                 setUser(null)
               }}
+              onUserUpdate={setUser}
             />
           }
         >
@@ -66,8 +90,8 @@ function App() {
           <Route path="/alias-settings" element={<AliasSettingsPage />} />
           <Route path="/alias-settings/new" element={<AliasEditPage />} />
           <Route path="/alias-settings/:id" element={<AliasEditPage />} />
-          <Route path="/account-settings" element={<ComingSoonPage title="Account Settings" />} />
-          <Route path="/team-settings" element={<ComingSoonPage title="Team Settings" />} />
+          <Route path="/account-settings" element={<AccountSettingsPage />} />
+          <Route path="/team-settings" element={<TeamSettingsPage />} />
           {import.meta.env.DEV && <Route path="/dev/pdf-preview" element={<PdfPreviewPage />} />}
         </Route>
       </Routes>

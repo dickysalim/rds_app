@@ -2,7 +2,7 @@ import type { jsPDF } from 'jspdf'
 import type { Business } from '@/lib/business'
 import type { Customer } from '@/lib/customers'
 import { loadColorLogoDataUrl } from '@/lib/logoCache'
-import type { NotaListItem } from '@/lib/nota'
+import { totalBillOf, type NotaListItem } from '@/lib/nota'
 
 // jsPDF + jspdf-autotable are a large dependency only needed once a PDF is
 // actually generated — loaded lazily here instead of at module import time
@@ -152,13 +152,13 @@ export async function buildBillPdf(
   const billNo = billNumber(customer, year, month)
 
   const tableStartY = drawLetterhead(doc, business, customer, billNo, year, month, logo)
-  const total = nota.reduce((sum, n) => sum + n.total_price, 0)
+  const total = nota.reduce((sum, n) => sum + totalBillOf(n), 0)
 
   autoTable(doc, {
     startY: tableStartY,
     margin: { left: MARGIN, right: MARGIN },
     head: [['No.', 'Tanggal Nota', 'Kode Nota', 'Total Biaya']],
-    body: nota.map((n, idx) => [String(idx + 1), n.nota_date, n.nota_number, fmt(n.total_price)]),
+    body: nota.map((n, idx) => [String(idx + 1), n.nota_date, n.nota_number, fmt(totalBillOf(n))]),
     styles: { font: 'helvetica', fontSize: 11, cellPadding: 2.5 },
     headStyles: {
       fillColor: false,
@@ -231,7 +231,7 @@ export async function buildBillPdf(
 const pdfBlobCache = new Map<string, Blob>()
 
 function billCacheKey(nota: NotaListItem[], customer: Customer, year: number, month: number): string {
-  const notaKey = nota.map((n) => `${n.nota_id}:${n.total_price}`).join(',')
+  const notaKey = nota.map((n) => `${n.nota_id}:${n.total_price}:${n.pajak_name}:${n.pajak_percentage}`).join(',')
   return `${billNumber(customer, year, month)}|${notaKey}`
 }
 

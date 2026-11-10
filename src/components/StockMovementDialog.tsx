@@ -17,10 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ProductCombobox } from '@/components/ProductCombobox'
 import { useCreateStockMovementMutation, useProductsQuery } from '@/lib/queries'
 
-const MOVEMENT_OPTIONS: { value: 'stock_input' | 'stock_loss'; label: string }[] = [
-  { value: 'stock_input', label: 'Stock In' },
+// adjust_up/adjust_down are not offered here -- they're only produced by
+// AdjustStockDialog, which derives the sign from a current-vs-new-stock diff.
+const ADD_OPTIONS: { value: 'production_in' | 'shipment_return'; label: string }[] = [
+  { value: 'production_in', label: 'Production In' },
+  { value: 'shipment_return', label: 'Shipment Return' },
+]
+
+const DEDUCT_OPTIONS: { value: 'stock_out' | 'stock_defect' | 'stock_loss'; label: string }[] = [
+  { value: 'stock_out', label: 'Stock Out' },
+  { value: 'stock_defect', label: 'Stock Defect' },
   { value: 'stock_loss', label: 'Stock Loss' },
 ]
 
@@ -31,14 +40,17 @@ function today() {
 export function StockMovementDialog({
   open,
   onOpenChange,
+  mode,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  mode: 'add' | 'deduct'
 }) {
+  const options = mode === 'add' ? ADD_OPTIONS : DEDUCT_OPTIONS
   const { data: products = [] } = useProductsQuery()
-  const [skuId, setSkuId] = useState('')
+  const [skuId, setSkuId] = useState<number | null>(null)
   const [date, setDate] = useState(today())
-  const [movementType, setMovementType] = useState<'stock_input' | 'stock_loss'>('stock_input')
+  const [movementType, setMovementType] = useState<typeof options[number]['value']>(options[0].value)
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -46,21 +58,25 @@ export function StockMovementDialog({
 
   useEffect(() => {
     if (open) {
-      setSkuId('')
+      setSkuId(null)
       setDate(today())
-      setMovementType('stock_input')
+      setMovementType(options[0].value)
       setQty('')
       setNote('')
       setError(null)
     }
-  }, [open])
+  }, [open, mode])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!skuId) {
+      setError('Select an item')
+      return
+    }
     try {
       await createMutation.mutateAsync({
-        sku_id: Number(skuId),
+        sku_id: skuId,
         date,
         movement_type: movementType,
         qty: Number(qty),
@@ -76,24 +92,15 @@ export function StockMovementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Stock Movement</DialogTitle>
-          <DialogDescription>Record a manual stock input or loss.</DialogDescription>
+          <DialogTitle>{mode === 'add' ? 'Add Product' : 'Deduct Product'}</DialogTitle>
+          <DialogDescription>
+            {mode === 'add' ? 'Record stock coming in.' : 'Record stock going out.'}
+          </DialogDescription>
         </DialogHeader>
         <form id="stock-movement-form" className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="sku_id">Item</Label>
-            <Select value={skuId} onValueChange={setSkuId} required>
-              <SelectTrigger id="sku_id" className="w-full">
-                <SelectValue placeholder="Select item" />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((product) => (
-                  <SelectItem key={product.sku_id} value={String(product.sku_id)}>
-                    {product.sku_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProductCombobox products={products} value={skuId} onChange={setSkuId} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="movement_type">Movement Type</Label>
@@ -102,7 +109,7 @@ export function StockMovementDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MOVEMENT_OPTIONS.map((option) => (
+                {options.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

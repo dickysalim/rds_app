@@ -35,7 +35,23 @@ import {
 import { clearAllNotaPdfCaches, invalidateNotaPdfCache } from '@/lib/notaPdf'
 import { clearPaymentPdfCache } from '@/lib/paymentPdf'
 import { createProduct, deleteProduct, listProducts, updateProduct, type ProductInput } from '@/lib/products'
-import { createStockMovement, listStockLedger, type StockMovementInput } from '@/lib/stockLedger'
+import {
+  createUser,
+  deactivateUser,
+  listUsers,
+  resetUserPassword,
+  updateUserRole,
+  type AssignableRole,
+  type CreateUserInput,
+} from '@/lib/users'
+import {
+  createStockMovement,
+  deleteStockMovement,
+  listStockLedger,
+  updateStockMovement,
+  type StockMovementInput,
+  type StockMovementUpdateInput,
+} from '@/lib/stockLedger'
 
 // Logo or business details changed — every cached PDF (client-side and the
 // server-side R2 nota cache) has the old letterhead baked in.
@@ -63,6 +79,7 @@ export const queryKeys = {
   customers: ['customers'] as const,
   products: ['products'] as const,
   stockLedger: ['stock-ledger'] as const,
+  users: ['users'] as const,
   notaList: (params?: Record<string, unknown>) => ['nota', 'list', params ?? {}] as const,
   notaDetail: (notaId: number) => ['nota', 'detail', notaId] as const,
   notaDateRange: ['nota', 'date-range'] as const,
@@ -188,6 +205,28 @@ export function useCreateStockMovementMutation() {
   })
 }
 
+export function useUpdateStockMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: StockMovementUpdateInput }) => updateStockMovement(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stockLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+    },
+  })
+}
+
+export function useDeleteStockMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => deleteStockMovement(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stockLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+    },
+  })
+}
+
 export function useCreateProductMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -210,6 +249,42 @@ export function useDeleteProductMutation() {
   return useMutation({
     mutationFn: (skuId: number) => deleteProduct(skuId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.products }),
+  })
+}
+
+// --- Users (Team Settings) -----------------------------------------------
+
+export function useUsersQuery() {
+  return useQuery({ queryKey: queryKeys.users, queryFn: listUsers })
+}
+
+export function useCreateUserMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateUserInput) => createUser(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users }),
+  })
+}
+
+export function useUpdateUserRoleMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: AssignableRole }) => updateUserRole(userId, role),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users }),
+  })
+}
+
+export function useResetUserPasswordMutation() {
+  return useMutation({
+    mutationFn: (userId: string) => resetUserPassword(userId),
+  })
+}
+
+export function useDeactivateUserMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => deactivateUser(userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users }),
   })
 }
 

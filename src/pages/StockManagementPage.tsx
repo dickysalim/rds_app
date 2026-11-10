@@ -1,5 +1,15 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Trash2 } from 'lucide-react'
 import { Fragment, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,12 +28,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { AdjustStockDialog } from '@/components/AdjustStockDialog'
+import { EditStockMovementDialog } from '@/components/EditStockMovementDialog'
 import { StockMovementDialog } from '@/components/StockMovementDialog'
 import { formatQty } from '@/lib/currency'
-import { useStockLedgerQuery } from '@/lib/queries'
+import { useDeleteStockMovementMutation, useStockLedgerQuery } from '@/lib/queries'
+import type { StockLedgerEntry } from '@/lib/stockLedger'
 
 const MOVEMENT_LABEL: Record<string, string> = {
-  stock_input: 'Stock In',
+  production_in: 'Production In',
+  shipment_return: 'Shipment Return',
+  stock_out: 'Stock Out',
+  stock_defect: 'Stock Defect',
   stock_loss: 'Stock Loss',
   adjust_up: 'Adjust Up',
   adjust_down: 'Adjust Down',
@@ -48,10 +64,21 @@ export function StockManagementPage() {
   const [skuFilter, setSkuFilter] = useState<Set<number>>(new Set())
   const [skuSearch, setSkuSearch] = useState('')
   const [createdByFilter, setCreatedByFilter] = useState(ALL)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [deductDialogOpen, setDeductDialogOpen] = useState(false)
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [expandedSkuId, setExpandedSkuId] = useState<number | null>(null)
+  const [editingEntry, setEditingEntry] = useState<StockLedgerEntry | null>(null)
+  const [deletingEntry, setDeletingEntry] = useState<StockLedgerEntry | null>(null)
+  const deleteMutation = useDeleteStockMovementMutation()
+
+  async function handleDelete() {
+    if (!deletingEntry) return
+    await deleteMutation.mutateAsync(deletingEntry.id)
+    setDeletingEntry(null)
+  }
 
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
@@ -70,12 +97,7 @@ export function StockManagementPage() {
   }
 
   function toggleExpanded(skuId: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(skuId)) next.delete(skuId)
-      else next.add(skuId)
-      return next
-    })
+    setExpandedSkuId((prev) => (prev === skuId ? null : skuId))
   }
 
   const periodEntries = entries.filter((entry) =>
@@ -207,17 +229,30 @@ export function StockManagementPage() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>+ Add Stock Movement</Button>
+        <div className="flex gap-2">
+          <Button
+            className="bg-[#3EA768] text-white hover:bg-[#357f52]"
+            onClick={() => setAddDialogOpen(true)}
+          >
+            + Add Product
+          </Button>
+          <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => setDeductDialogOpen(true)}>
+            - Deduct Product
+          </Button>
+          <Button onClick={() => setAdjustDialogOpen(true)}>
+            Adjust Product
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Item Name</TableHead>
-              <TableHead>Stock Increase</TableHead>
-              <TableHead>Stock Decrease</TableHead>
-              <TableHead>Net Stock Change</TableHead>
+              <TableHead className="font-bold">Item Name</TableHead>
+              <TableHead className="font-bold">Stock Increase</TableHead>
+              <TableHead className="font-bold">Stock Decrease</TableHead>
+              <TableHead className="font-bold">Net Stock Change</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -236,7 +271,7 @@ export function StockManagementPage() {
               </TableRow>
             ) : (
               items.map((item) => {
-                const isOpen = expanded.has(item.sku_id)
+                const isOpen = expandedSkuId === item.sku_id
                 return (
                   <Fragment key={item.sku_id}>
                     <TableRow
@@ -266,21 +301,28 @@ export function StockManagementPage() {
                         {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </TableCell>
                     </TableRow>
-                    {isOpen && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="bg-muted/30 p-0">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Business Date</TableHead>
-                                <TableHead>Movement Type</TableHead>
-                                <TableHead>Created By</TableHead>
-                                <TableHead>Qty</TableHead>
-                                <TableHead>Invoice Number</TableHead>
-                                <TableHead>Note</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <TableRow>
+                      <TableCell colSpan={5} className="bg-muted/30 p-0">
+                        <div
+                          className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                            isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="pl-10">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="font-bold">Business Date</TableHead>
+                                    <TableHead className="font-bold">Movement Type</TableHead>
+                                    <TableHead className="font-bold">Created By</TableHead>
+                                    <TableHead className="font-bold">Qty</TableHead>
+                                    <TableHead className="font-bold">Invoice Number</TableHead>
+                                    <TableHead className="font-bold">Note</TableHead>
+                                    <TableHead className="w-20" />
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
                               {item.movements.map((movement) => (
                                 <TableRow key={`${movement.kind}-${movement.id}`}>
                                   <TableCell>{formatBusinessDate(movement.date)}</TableCell>
@@ -292,13 +334,43 @@ export function StockManagementPage() {
                                   </TableCell>
                                   <TableCell>{movement.invoice_number ?? '-'}</TableCell>
                                   <TableCell>{movement.note ?? '-'}</TableCell>
+                                  <TableCell>
+                                    {movement.kind === 'ledger' && (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setEditingEntry(movement)
+                                          }}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setDeletingEntry(movement)
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-red-600" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
-                          </Table>
-                        </TableCell>
-                      </TableRow>
-                    )}
+                              </Table>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   </Fragment>
                 )
               })
@@ -307,7 +379,32 @@ export function StockManagementPage() {
         </Table>
       </div>
 
-      <StockMovementDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <StockMovementDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} mode="add" />
+      <StockMovementDialog open={deductDialogOpen} onOpenChange={setDeductDialogOpen} mode="deduct" />
+      <AdjustStockDialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen} />
+      <EditStockMovementDialog
+        open={!!editingEntry}
+        onOpenChange={(open) => !open && setEditingEntry(null)}
+        entry={editingEntry}
+      />
+
+      <AlertDialog open={!!deletingEntry} onOpenChange={(open) => !open && setDeletingEntry(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete stock movement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove this entry from the stock ledger and recompute current stock. It stays on
+              record for audit (who deleted it is saved), but won't show here again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

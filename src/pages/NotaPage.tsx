@@ -281,9 +281,6 @@ export function NotaPage() {
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
-            <TableHead className="text-right">Sub Total</TableHead>
-            <TableHead>Pajak Name</TableHead>
-            <TableHead className="text-right">Pajak Cost</TableHead>
             <TableHead className="text-right">Total Bill</TableHead>
             <TableHead className="text-right">Cost</TableHead>
             <TableHead className="text-right">Profit</TableHead>
@@ -294,13 +291,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={12} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={12} className="text-center text-muted-foreground">
+              <TableCell colSpan={9} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -318,13 +315,17 @@ export function NotaPage() {
                     <TableCell>{n.nota_date}</TableCell>
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
                     <TableCell>{n.contact_name_snapshot ?? '-'}</TableCell>
-                    <TableCell className="text-right">{formatRupiah(n.total_price)}</TableCell>
-                    <TableCell>
-                      {n.pajak_name ? `${n.pajak_name} (${n.pajak_percentage}%)` : '-'}
-                    </TableCell>
-                    <TableCell className="text-right">{formatRupiah(pajakCostOf(n))}</TableCell>
                     <TableCell className="text-right">{formatRupiah(totalBillOf(n))}</TableCell>
-                    <TableCell className="text-right">{formatRupiah(n.total_cost)}</TableCell>
+                    <TableCell className="text-right leading-tight">
+                      <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                        <span>Cost</span>
+                        <span className="text-center">:</span>
+                        <span>{formatRupiah(n.total_cost)}</span>
+                        <span>Tax</span>
+                        <span className="text-center">:</span>
+                        <span>{formatRupiah(pajakCostOf(n))}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatRupiah(n.total_price - n.total_cost)}
                     </TableCell>
@@ -369,7 +370,7 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-panel pl-14">
+                      <TableCell colSpan={9} className="bg-panel pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (
