@@ -661,7 +661,7 @@ export function NotaCreatePanel({
                   />
                   {currentStock != null && (
                     <p
-                      className={`mt-0.5 text-xs ${exceedsStock(row) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                      className={`mt-0.5 whitespace-nowrap text-xs ${exceedsStock(row) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
                     >
                       {exceedsStock(row)
                         ? `Exceeds stock (${formatQty(currentStock)} available)`

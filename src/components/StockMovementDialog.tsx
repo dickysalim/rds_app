@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ProductCombobox } from '@/components/ProductCombobox'
+import { formatQty } from '@/lib/currency'
 import { useCreateStockMovementMutation, useProductsQuery } from '@/lib/queries'
 
 // adjust_up/adjust_down are not offered here -- they're only produced by
@@ -56,6 +57,11 @@ export function StockMovementDialog({
   const [error, setError] = useState<string | null>(null)
   const createMutation = useCreateStockMovementMutation()
 
+  const selectedProduct = products.find((p) => p.sku_id === skuId) ?? null
+  const currentStock = selectedProduct?.current_stock ?? 0
+  const qtyNum = Number(qty) || 0
+  const exceedsStock = mode === 'deduct' && !!skuId && qtyNum > currentStock
+
   useEffect(() => {
     if (open) {
       setSkuId(null)
@@ -72,6 +78,10 @@ export function StockMovementDialog({
     setError(null)
     if (!skuId) {
       setError('Select an item')
+      return
+    }
+    if (exceedsStock) {
+      setError(`Not enough stock: only ${formatQty(currentStock)} available`)
       return
     }
     try {
@@ -101,6 +111,11 @@ export function StockMovementDialog({
           <div className="space-y-2">
             <Label htmlFor="sku_id">Item</Label>
             <ProductCombobox products={products} value={skuId} onChange={setSkuId} />
+            {mode === 'deduct' && selectedProduct && (
+              <p className="text-xs text-muted-foreground">
+                Current stock: {formatQty(currentStock)}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="movement_type">Movement Type</Label>
@@ -127,6 +142,11 @@ export function StockMovementDialog({
                 onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ''))}
                 required
               />
+              {exceedsStock && (
+                <p className="text-xs text-destructive">
+                  Only {formatQty(currentStock)} available
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
@@ -146,7 +166,11 @@ export function StockMovementDialog({
           {error && <p className="text-destructive text-sm">{error}</p>}
         </form>
         <DialogFooter>
-          <Button type="submit" form="stock-movement-form" disabled={createMutation.isPending}>
+          <Button
+            type="submit"
+            form="stock-movement-form"
+            disabled={createMutation.isPending || exceedsStock}
+          >
             {createMutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </DialogFooter>
