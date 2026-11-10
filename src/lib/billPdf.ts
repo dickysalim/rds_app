@@ -230,9 +230,15 @@ export async function buildBillPdf(
 // (and their totals) went into it, so adding a nota invalidates it for free.
 const pdfBlobCache = new Map<string, Blob>()
 
-function billCacheKey(nota: NotaListItem[], customer: Customer, year: number, month: number): string {
+function billCacheKey(
+  nota: NotaListItem[],
+  customer: Customer,
+  business: Business,
+  year: number,
+  month: number,
+): string {
   const notaKey = nota.map((n) => `${n.nota_id}:${n.total_price}:${n.pajak_name}:${n.pajak_percentage}`).join(',')
-  return `${billNumber(customer, year, month)}|${notaKey}`
+  return `${billNumber(customer, year, month)}|${business.business_id}|${notaKey}`
 }
 
 async function getBillPdfBlob(
@@ -242,7 +248,7 @@ async function getBillPdfBlob(
   year: number,
   month: number,
 ): Promise<Blob> {
-  const key = billCacheKey(nota, customer, year, month)
+  const key = billCacheKey(nota, customer, business, year, month)
   const cached = pdfBlobCache.get(key)
   if (cached) return cached
 

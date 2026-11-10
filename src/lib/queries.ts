@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
   createBusinessAlias,
+  deleteBusinessAlias,
   getBusiness,
   listBusinessAliases,
   updateBusiness,
@@ -34,7 +35,14 @@ import {
 } from '@/lib/nota'
 import { clearAllNotaPdfCaches, invalidateNotaPdfCache } from '@/lib/notaPdf'
 import { clearPaymentPdfCache } from '@/lib/paymentPdf'
-import { createProduct, deleteProduct, listProducts, updateProduct, type ProductInput } from '@/lib/products'
+import {
+  createProduct,
+  deleteProduct,
+  listProducts,
+  updateProduct,
+  type CreateProductInput,
+  type ProductInput,
+} from '@/lib/products'
 import {
   createUser,
   deactivateUser,
@@ -140,6 +148,16 @@ export function useUpdateBusinessAliasMutation() {
   })
 }
 
+export function useDeleteBusinessAliasMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (businessId: number) => deleteBusinessAlias(businessId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessAliases })
+    },
+  })
+}
+
 export function useUploadBusinessAliasLogoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -230,7 +248,7 @@ export function useDeleteStockMovementMutation() {
 export function useCreateProductMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: ProductInput) => createProduct(input),
+    mutationFn: (input: CreateProductInput) => createProduct(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.products }),
   })
 }

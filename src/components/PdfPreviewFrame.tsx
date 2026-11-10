@@ -1,4 +1,5 @@
-import { PrinterIcon } from 'lucide-react'
+import { Download, PrinterIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 
 // iPadOS is reported as "MacIntel" with touch support, so UA string alone
@@ -8,53 +9,51 @@ const IS_IOS =
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
-// iOS/iPadOS Safari frequently renders a blank <iframe src="blob:..."> for
-// PDFs (embedded PDF viewer support is unreliable there). <object> works in
-// more cases, and the "Open in new tab" link is a guaranteed fallback since
-// Safari's native PDF viewer always handles a direct navigation.
+// A hidden offscreen iframe used to drive print() here, but desktop Safari
+// (macOS) renders it inconsistently -- the print dialog would flash and the
+// iframe got removed before it settled. Opening the PDF in a real tab uses
+// the browser's own PDF viewer (its "proper printing modal"), which prints
+// reliably on Windows and macOS alike, to whatever digital printer is the
+// OS/browser default -- separate from the dot-matrix path, which goes
+// through QZ Tray instead of the browser.
 function printPdf(url: string) {
-  if (IS_IOS) {
-    // iOS has no reliable programmatic print() for embedded PDFs; its own
-    // full-page PDF viewer has a Print option in the share sheet.
-    window.open(url, '_blank', 'noopener,noreferrer')
-    return
-  }
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.top = '0'
-  iframe.style.left = '-10000px'
-  iframe.style.width = '100vw'
-  iframe.style.height = '100vh'
-  iframe.src = url
-  iframe.onload = () => {
-    iframe.contentWindow?.focus()
-    iframe.contentWindow?.print()
-    setTimeout(() => iframe.remove(), 1000)
-  }
-  document.body.appendChild(iframe)
+  const win = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!win || IS_IOS) return
+  // iOS has no reliable programmatic print() for embedded PDFs; its own
+  // full-page PDF viewer has a Print option in the share sheet instead.
+  win.addEventListener('load', () => {
+    win.focus()
+    win.print()
+  })
 }
 
 export function PdfPreviewFrame({
   title,
   url,
   frameClassName = 'h-[80vh] w-full rounded-md border',
+  leftContent,
 }: {
   title: string
   url: string
   frameClassName?: string
+  leftContent?: ReactNode
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">{leftContent}</div>
+        <div className="flex gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => printPdf(url)}>
           <PrinterIcon />
           Print
         </Button>
         <Button type="button" variant="outline" size="sm" asChild>
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            Open in new tab
+          <a href={url} download={`${title}.pdf`}>
+            <Download />
+            Download PDF
           </a>
         </Button>
+        </div>
       </div>
       <object
         data={`${url}#toolbar=0&navpanes=0&scrollbar=0`}

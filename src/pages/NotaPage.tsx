@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +38,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { AppOutletContext } from '@/components/AppLayout'
 import { CompanyOverviewView } from '@/components/CompanyOverviewView'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { NotaCreatePanel } from '@/components/NotaCreatePanel'
 import { NotaDetailPanel } from '@/components/NotaDetailPanel'
+import { hideFinancials } from '@/lib/access'
 import { formatRupiah } from '@/lib/currency'
 import {
   billPeriodOf,
@@ -61,6 +64,8 @@ import { queryKeys, useBusinessQuery, useNotaListQuery, useVoidNotaMutation } fr
 const PAGE_SIZE = 25
 
 export function NotaPage() {
+  const { user } = useOutletContext<AppOutletContext>()
+  const hideCost = hideFinancials(user.role)
   const queryClient = useQueryClient()
   const { data: business } = useBusinessQuery()
   const voidMutation = useVoidNotaMutation()
@@ -282,8 +287,8 @@ export function NotaPage() {
             <TableHead>Customer</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead className="text-right">Total Bill</TableHead>
-            <TableHead className="text-right">Cost</TableHead>
-            <TableHead className="text-right">Profit</TableHead>
+            {!hideCost && <TableHead className="text-right">Cost</TableHead>}
+            {!hideCost && <TableHead className="text-right">Profit</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead className="w-8" />
           </TableRow>
@@ -291,13 +296,13 @@ export function NotaPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 7 : 9} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 7 : 9} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -316,19 +321,23 @@ export function NotaPage() {
                     <TableCell>{n.customer_company_name_snapshot}</TableCell>
                     <TableCell>{n.contact_name_snapshot ?? '-'}</TableCell>
                     <TableCell className="text-right">{formatRupiah(totalBillOf(n))}</TableCell>
-                    <TableCell className="text-right leading-tight">
-                      <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
-                        <span>Cost</span>
-                        <span className="text-center">:</span>
-                        <span>{formatRupiah(n.total_cost)}</span>
-                        <span>Tax</span>
-                        <span className="text-center">:</span>
-                        <span>{formatRupiah(pajakCostOf(n))}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatRupiah(n.total_price - n.total_cost)}
-                    </TableCell>
+                    {!hideCost && (
+                      <TableCell className="text-right leading-tight">
+                        <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                          <span>Cost</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(n.total_cost)}</span>
+                          <span>Tax</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(pajakCostOf(n))}</span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {!hideCost && (
+                      <TableCell className="text-right">
+                        {formatRupiah(n.total_price - n.total_cost)}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <span className={statusPillClass(n.status)}>{statusLabel(n.status)}</span>
                     </TableCell>
@@ -370,7 +379,7 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={9} className="bg-panel pl-14">
+                      <TableCell colSpan={hideCost ? 7 : 9} className="bg-panel pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (

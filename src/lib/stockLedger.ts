@@ -4,6 +4,7 @@ export type StockMovementType =
   | 'production_in'
   | 'shipment_return'
   | 'adjust_up'
+  | 'initial_stock'
   | 'stock_loss'
   | 'stock_out'
   | 'stock_defect'

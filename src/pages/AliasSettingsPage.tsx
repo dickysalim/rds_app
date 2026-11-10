@@ -1,12 +1,38 @@
+import { MoreHorizontal } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { getBusinessAliasLogoUrl } from '@/lib/business'
-import { useBusinessAliasesQuery } from '@/lib/queries'
+import { getBusinessAliasLogoUrl, type BusinessAlias } from '@/lib/business'
+import { useBusinessAliasesQuery, useDeleteBusinessAliasMutation } from '@/lib/queries'
 
 export function AliasSettingsPage() {
   const { data: aliases = [], isLoading: loading } = useBusinessAliasesQuery()
+  const deleteMutation = useDeleteBusinessAliasMutation()
   const navigate = useNavigate()
+  const [deletingAlias, setDeletingAlias] = useState<BusinessAlias | null>(null)
+
+  async function handleDelete() {
+    if (!deletingAlias) return
+    await deleteMutation.mutateAsync(deletingAlias.business_id)
+    setDeletingAlias(null)
+  }
 
   return (
     <div className="space-y-4">
@@ -71,13 +97,24 @@ export function AliasSettingsPage() {
                   <TableCell>{alias.payment_account_name ?? '-'}</TableCell>
                   <TableCell>{alias.payment_account_number ?? '-'}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/alias-settings/${alias.business_id}`)}
-                    >
-                      Edit
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/alias-settings/${alias.business_id}`)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setDeletingAlias(alias)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -85,6 +122,24 @@ export function AliasSettingsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!deletingAlias} onOpenChange={(open) => !open && setDeletingAlias(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete alias?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove "{deletingAlias?.business_name}" from the alias list. Nota and
+              payments already issued under it are unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

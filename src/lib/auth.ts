@@ -70,8 +70,10 @@ export function logout(): void {
 const ROLE_LABEL: Record<string, string> = {
   super_admin: 'Super Admin',
   owner: 'Owner',
+  admin: 'Admin',
   staff: 'Staff',
   quality_control: 'Quality Control',
+  staging_admin: 'Admin',
 }
 
 export function roleLabel(role: string): string {

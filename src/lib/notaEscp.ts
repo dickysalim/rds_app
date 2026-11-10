@@ -364,6 +364,68 @@ export async function printNotaEscp(
   await printRawEscp(bytes, printerName)
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Fallback for PCs without QZ Tray installed: renders the same lines as
+// plain HTML in a hidden iframe and uses the browser's own print dialog, so
+// Print still produces output even with no raw-printer bridge available.
+export function printNotaEscpViaBrowser(
+  nota: NotaDetail,
+  business: Business,
+  docType: NotaDocType = 'nota_pembelian',
+): void {
+  const lines = buildNotaEscpLines(nota, business, docType)
+  const rows = lines
+    .map((l) => {
+      const style = [
+        l.bold && 'font-weight:bold',
+        l.underline && 'text-decoration:underline',
+        l.wide && 'letter-spacing:0.12em',
+      ]
+        .filter(Boolean)
+        .join(';')
+      const content = l.segments
+        ? l.segments
+            .map((s) => {
+              const segStyle = [s.bold && 'font-weight:bold', s.underline && 'text-decoration:underline']
+                .filter(Boolean)
+                .join(';')
+              return `<span style="${segStyle}">${escapeHtml(s.text)}</span>`
+            })
+            .join('')
+        : escapeHtml(l.text) || '&nbsp;'
+      return `<div style="height:20px;${style}">${content}</div>`
+    })
+    .join('')
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    body{margin:0;padding:12px;}
+    pre{font-family:monospace;font-size:14px;line-height:20px;white-space:pre;margin:0;}
+  </style></head><body><pre>${rows}</pre></body></html>`
+
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.top = '0'
+  iframe.style.left = '-10000px'
+  iframe.style.width = '100vw'
+  iframe.style.height = '100vh'
+  document.body.appendChild(iframe)
+  const doc = iframe.contentDocument
+  if (!doc) {
+    iframe.remove()
+    return
+  }
+  doc.open()
+  doc.write(html)
+  doc.close()
+  iframe.onload = () => {
+    iframe.contentWindow?.focus()
+    iframe.contentWindow?.print()
+    setTimeout(() => iframe.remove(), 1000)
+  }
+}
+
 export function downloadNotaEscp(nota: NotaDetail, business: Business, docType: NotaDocType = 'nota_pembelian'): void {
   const bytes = buildNotaEscp(nota, business, docType)
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }))

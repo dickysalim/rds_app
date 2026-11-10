@@ -1,18 +1,15 @@
-import { Download, PrinterIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { PrinterIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EscpContent } from '@/components/EscpContent'
 import { PAJAK_DEFAULT_PERCENTAGE, PAJAK_NAME_OPTIONS } from '@/components/NotaCreatePanel'
-import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
-import { downloadNotaEscp, printNotaEscp, type NotaDocType } from '@/lib/notaEscp'
-import { previewNotaPdfUrl } from '@/lib/notaPdf'
+import { printNotaEscp, printNotaEscpViaBrowser, type NotaDocType } from '@/lib/notaEscp'
 import {
   useBusinessAliasesQuery,
   useBusinessQuery,
@@ -26,8 +23,6 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
   const { data: businessAliases = [] } = useBusinessAliasesQuery()
   const updateNotaMutation = useUpdateNotaMutation()
   const [error, setError] = useState<string | null>(null)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const blobUrlRef = useRef<string | null>(null)
   const [docType, setDocType] = useState<NotaDocType>('nota_pembelian')
   const [issuerBusinessId, setIssuerBusinessId] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
@@ -77,29 +72,7 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
 
   useEffect(() => {
     if (!nota || business === undefined) return
-    let cancelled = false
-    if (!effectiveBusiness) {
-      setError('Set up Business Settings first')
-      return
-    }
-    previewNotaPdfUrl(nota, effectiveBusiness)
-      .then((url) => {
-        if (cancelled) {
-          URL.revokeObjectURL(url)
-          return
-        }
-        blobUrlRef.current = url
-        setPdfUrl(url)
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message)
-      })
-    return () => {
-      cancelled = true
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
-      blobUrlRef.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!effectiveBusiness) setError('Set up Business Settings first')
   }, [nota, business, effectiveBusiness])
 
   async function handlePrintEscp() {
@@ -107,14 +80,11 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
     try {
       await printNotaEscp(nota, effectiveBusiness, undefined, docType)
       toast.success('Sent to printer')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to print')
+    } catch {
+      // QZ Tray not installed/running -- fall back to the browser's own print
+      // dialog so Print still works on a plain PC.
+      printNotaEscpViaBrowser(nota, effectiveBusiness, docType)
     }
-  }
-
-  function handleDownloadEscp() {
-    if (!nota || !effectiveBusiness) return
-    downloadNotaEscp(nota, effectiveBusiness, docType)
   }
 
   return (
@@ -127,60 +97,35 @@ export function NotaDetailPanel({ notaId, onBack }: { notaId: number; onBack: ()
           <p className="py-8 text-center text-sm text-destructive">{error}</p>
         ) : (
           <div className="flex min-h-0 flex-1 gap-4">
-            <Tabs defaultValue="escp" className="flex min-h-0 flex-1 flex-col">
-              <TabsList className="self-start">
-                <TabsTrigger value="escp">Continuous Print</TabsTrigger>
-                <TabsTrigger value="pdf">PDF (A4)</TabsTrigger>
-              </TabsList>
-              <TabsContent value="pdf" className="min-h-0 flex-1">
-                {pdfUrl ? (
-                  <PdfPreviewFrame title="Nota PDF" url={pdfUrl} frameClassName="w-full rounded-md border" />
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
-                )}
-              </TabsContent>
-              <TabsContent value="escp" className="flex min-h-0 flex-1 flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Select value={docType} onValueChange={(v) => setDocType(v as NotaDocType)}>
-                    <SelectTrigger id="doc_type" className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nota_pembelian">Nota Pembelian</SelectItem>
-                      <SelectItem value="surat_jalan">Surat Jalan</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handlePrintEscp}
-                      disabled={!nota || !effectiveBusiness}
-                    >
-                      <PrinterIcon />
-                      Print
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadEscp}
-                      disabled={!nota || !effectiveBusiness}
-                    >
-                      <Download />
-                      Download (.prn)
-                    </Button>
-                  </div>
-                </div>
-                <EscpContent
-                  nota={nota ?? null}
-                  business={effectiveBusiness ?? null}
-                  docType={docType}
-                  className="min-h-0 flex-1"
-                />
-              </TabsContent>
-            </Tabs>
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Select value={docType} onValueChange={(v) => setDocType(v as NotaDocType)}>
+                  <SelectTrigger id="doc_type" className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nota_pembelian">Nota Pembelian</SelectItem>
+                    <SelectItem value="surat_jalan">Surat Jalan</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrintEscp}
+                  disabled={!nota || !effectiveBusiness}
+                >
+                  <PrinterIcon />
+                  Print
+                </Button>
+              </div>
+              <EscpContent
+                nota={nota ?? null}
+                business={effectiveBusiness ?? null}
+                docType={docType}
+                className="min-h-0 flex-1"
+              />
+            </div>
             <div className="flex w-80 flex-col gap-4 border-l pl-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="detail_alias">Alias</Label>

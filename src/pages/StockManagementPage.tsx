@@ -45,6 +45,7 @@ import type { StockLedgerEntry } from '@/lib/stockLedger'
 const MOVEMENT_LABEL: Record<string, string> = {
   production_in: 'Production In',
   shipment_return: 'Shipment Return',
+  initial_stock: 'Initial Stock',
   stock_out: 'Stock Out',
   stock_defect: 'Stock Defect',
   stock_loss: 'Stock Loss',

@@ -151,10 +151,11 @@ export function AliasEditPage() {
       }
       if (alias) {
         await updateMutation.mutateAsync({ businessId: alias.business_id, input })
+        navigate('/alias-settings')
       } else {
-        await createMutation.mutateAsync(input)
+        const created = await createMutation.mutateAsync(input)
+        navigate(`/alias-settings/${created.business_id}`, { replace: true })
       }
-      navigate('/alias-settings')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save alias')
     }

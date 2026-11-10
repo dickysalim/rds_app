@@ -178,6 +178,7 @@ export function NotaCreatePanel({
     : customers.slice(0, 5)
 
   const grandTotal = items.reduce((sum, row) => sum + subtotalOf(row), 0)
+  const anyExceedsStock = items.some(exceedsStock)
 
   function exceedsStock(row: ItemRow): boolean {
     if (row.skuId === null) return false
@@ -315,7 +316,7 @@ export function NotaCreatePanel({
           <h1 className="text-2xl font-semibold tracking-tight">Add Nota</h1>
           <p className="text-sm text-muted-foreground">Create a new nota for a customer.</p>
         </div>
-        <Button type="submit" form="nota-form" size="lg" disabled={loading}>
+        <Button type="submit" form="nota-form" size="lg" disabled={loading || anyExceedsStock}>
           {loading ? 'Saving…' : 'Save'}
         </Button>
       </div>
@@ -654,15 +655,18 @@ export function NotaCreatePanel({
                     inputMode="numeric"
                     value={row.qty}
                     onChange={(e) => {
-                      let qty = e.target.value.replace(/[^0-9.]/g, '')
-                      if (currentStock != null && Number(qty) > currentStock) {
-                        qty = String(currentStock)
-                      }
+                      const qty = e.target.value.replace(/[^0-9.]/g, '')
                       updateItem(row.key, { qty })
                     }}
                   />
                   {currentStock != null && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">Stock: {formatQty(currentStock)}</p>
+                    <p
+                      className={`mt-0.5 text-xs ${exceedsStock(row) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                    >
+                      {exceedsStock(row)
+                        ? `Exceeds stock (${formatQty(currentStock)} available)`
+                        : `Stock: ${formatQty(currentStock)}`}
+                    </p>
                   )}
                 </div>
                 <div className="relative min-w-0">

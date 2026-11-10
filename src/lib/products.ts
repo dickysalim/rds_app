@@ -24,9 +24,14 @@ export interface ProductInput {
   sku_name: string
   unit: string
   suggested_price: number | null
+  cost_price: number | null
 }
 
-export async function createProduct(input: ProductInput): Promise<Product> {
+export interface CreateProductInput extends ProductInput {
+  initial_stock: number | null
+}
+
+export async function createProduct(input: CreateProductInput): Promise<Product> {
   const res = await apiFetch('/products', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

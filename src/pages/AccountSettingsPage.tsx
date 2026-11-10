@@ -1,13 +1,25 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { AppOutletContext } from '@/components/AppLayout'
 import { roleLabel, updateAccountName, updatePassword } from '@/lib/auth'
+import { isUsingStagingDb, setUsingStagingDb } from '@/lib/api'
+import { resetAllCachesForDbSwitch } from '@/lib/queries'
 
 export function AccountSettingsPage() {
   const { user, onUserUpdate } = useOutletContext<AppOutletContext>()
+  const queryClient = useQueryClient()
+  const [useStaging, setUseStaging] = useState(() => isUsingStagingDb())
+
+  function handleToggleStaging() {
+    const next = !useStaging
+    setUsingStagingDb(next)
+    setUseStaging(next)
+    resetAllCachesForDbSwitch(queryClient)
+  }
 
   const [name, setName] = useState(user.name)
   const [nameError, setNameError] = useState<string | null>(null)
@@ -84,6 +96,22 @@ export function AccountSettingsPage() {
         <Label>Role</Label>
         <p className="text-muted-foreground text-sm">{roleLabel(user.role)}</p>
       </div>
+
+      {user.role === 'staging_admin' && (
+        <div className="flex items-center justify-between gap-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Staging Database</p>
+            <p className="text-sm text-muted-foreground">
+              {useStaging
+                ? 'Currently reading and writing the staging database (mock data), not the real one.'
+                : 'Currently on the real database. Flip this to test against staging instead.'}
+            </p>
+          </div>
+          <Button type="button" variant={useStaging ? 'default' : 'outline'} onClick={handleToggleStaging}>
+            {useStaging ? 'Staging: ON' : 'Staging: OFF'}
+          </Button>
+        </div>
+      )}
 
       <form className="space-y-4" onSubmit={handleNameSubmit}>
         <div className="space-y-2">

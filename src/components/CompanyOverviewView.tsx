@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -37,14 +39,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { AppOutletContext } from '@/components/AppLayout'
 import { MakePaymentDialog } from '@/components/MakePaymentDialog'
 import { previewBillPdfUrl } from '@/lib/billPdf'
+import { hideFinancials } from '@/lib/access'
 import { formatRupiah } from '@/lib/currency'
 import { getNota, getPaymentEvidenceUrl, listBillPayments, pajakCostOf, statusLabel, statusPillClass, sumTotals, totalBillOf, voidPayment, type NotaListItem, type Payment, type Totals } from '@/lib/nota'
 import { downloadNotaPdf } from '@/lib/notaPdf'
 import { downloadPaymentPdf, previewPaymentPdfUrl } from '@/lib/paymentPdf'
 import {
   queryKeys,
+  useBusinessAliasesQuery,
   useBusinessQuery,
   useCustomersQuery,
   useNotaDateRangeQuery,
@@ -98,8 +103,12 @@ export function CompanyOverviewView({
   onSelectNota: (notaId: number) => void
   onDetailOpenChange?: (open: boolean) => void
 }) {
+  const { user } = useOutletContext<AppOutletContext>()
+  const hideCost = hideFinancials(user.role)
   const queryClient = useQueryClient()
   const { data: business } = useBusinessQuery()
+  const { data: businessAliases = [] } = useBusinessAliasesQuery()
+  const businessOptions = [...(business ? [business] : []), ...businessAliases]
   const { data: customers = [] } = useCustomersQuery()
   const voidMutation = useVoidNotaMutation()
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
@@ -115,6 +124,10 @@ export function CompanyOverviewView({
   const [paymentPdfLoading, setPaymentPdfLoading] = useState(false)
   const [paymentPdfError, setPaymentPdfError] = useState<string | null>(null)
   const paymentPdfBlobRef = useRef<string | null>(null)
+  const [paymentPdfArgs, setPaymentPdfArgs] = useState<{ company: CompanyGroup; payment: Payment } | null>(
+    null,
+  )
+  const [paymentAliasId, setPaymentAliasId] = useState<number | null>(null)
   const [comingSoon, setComingSoon] = useState<string | null>(null)
   const [paymentDialogCompany, setPaymentDialogCompany] = useState<string | null>(null)
   const [paymentDialogCustomerId, setPaymentDialogCustomerId] = useState(0)
@@ -123,6 +136,8 @@ export function CompanyOverviewView({
   const [billPdfLoading, setBillPdfLoading] = useState(false)
   const [billPdfError, setBillPdfError] = useState<string | null>(null)
   const billPdfBlobRef = useRef<string | null>(null)
+  const [billPdfCompany, setBillPdfCompany] = useState<CompanyGroup | null>(null)
+  const [billAliasId, setBillAliasId] = useState<number | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -255,24 +270,47 @@ export function CompanyOverviewView({
     }
     setPaymentPdfUrl(null)
     setPaymentPdfError(null)
+    setPaymentPdfArgs(null)
   }
 
-  async function handleSeePaymentPdf(company: CompanyGroup, payment: Payment) {
+  function handleSeePaymentPdf(company: CompanyGroup, payment: Payment) {
+    setPaymentAliasId(business?.business_id ?? null)
+    setPaymentPdfArgs({ company, payment })
+    setPaymentPdfLoading(true)
+  }
+
+  useEffect(() => {
+    if (!paymentPdfArgs) return
+    const biz = businessOptions.find((b) => b.business_id === paymentAliasId) ?? business
+    if (!biz) {
+      setPaymentPdfError('Set up Business Settings first')
+      setPaymentPdfLoading(false)
+      return
+    }
+    let cancelled = false
     setPaymentPdfLoading(true)
     setPaymentPdfError(null)
-    setPaymentPdfUrl(null)
-    try {
-      if (!business) throw new Error('Set up Business Settings first')
-      const url = await previewPaymentPdfUrl(company.nota[0], payment, business)
-      if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
-      paymentPdfBlobRef.current = url
-      setPaymentPdfUrl(url)
-    } catch (err) {
-      setPaymentPdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
-    } finally {
-      setPaymentPdfLoading(false)
+    previewPaymentPdfUrl(paymentPdfArgs.company.nota[0], paymentPdfArgs.payment, biz)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        if (paymentPdfBlobRef.current) URL.revokeObjectURL(paymentPdfBlobRef.current)
+        paymentPdfBlobRef.current = url
+        setPaymentPdfUrl(url)
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setPaymentPdfError(err.message ?? 'Failed to generate PDF')
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentPdfLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentPdfArgs, paymentAliasId])
 
   async function handleDownloadPaymentPdf(company: CompanyGroup, payment: Payment) {
     try {
@@ -306,31 +344,53 @@ export function CompanyOverviewView({
     }
     setBillPdfUrl(null)
     setBillPdfError(null)
+    setBillPdfCompany(null)
   }
 
-  async function handlePrintBill(company: CompanyGroup) {
-    const customer = customers.find((c) => c.company_name === company.company)
+  function handlePrintBill(company: CompanyGroup) {
+    setBillAliasId(business?.business_id ?? null)
+    setBillPdfCompany(company)
+    setBillPdfLoading(true)
+  }
+
+  useEffect(() => {
+    if (!billPdfCompany) return
+    const customer = customers.find((c) => c.company_name === billPdfCompany.company)
     if (!customer) {
       setBillPdfError('Customer record not found for this company')
       setBillPdfLoading(false)
-      setBillPdfUrl(null)
       return
     }
+    const biz = businessOptions.find((b) => b.business_id === billAliasId) ?? business
+    if (!biz) {
+      setBillPdfError('Set up Business Settings first')
+      setBillPdfLoading(false)
+      return
+    }
+    let cancelled = false
     setBillPdfLoading(true)
     setBillPdfError(null)
-    setBillPdfUrl(null)
-    try {
-      if (!business) throw new Error('Set up Business Settings first')
-      const url = await previewBillPdfUrl(company.nota, customer, business, selectedYear, selectedMonth)
-      if (billPdfBlobRef.current) URL.revokeObjectURL(billPdfBlobRef.current)
-      billPdfBlobRef.current = url
-      setBillPdfUrl(url)
-    } catch (err) {
-      setBillPdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
-    } finally {
-      setBillPdfLoading(false)
+    previewBillPdfUrl(billPdfCompany.nota, customer, biz, selectedYear, selectedMonth)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        if (billPdfBlobRef.current) URL.revokeObjectURL(billPdfBlobRef.current)
+        billPdfBlobRef.current = url
+        setBillPdfUrl(url)
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setBillPdfError(err.message ?? 'Failed to generate PDF')
+      })
+      .finally(() => {
+        if (!cancelled) setBillPdfLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billPdfCompany, billAliasId, customers, selectedYear, selectedMonth])
 
   const sharedDialogs = (
     <>
@@ -383,6 +443,30 @@ export function CompanyOverviewView({
               title="Payment PDF"
               url={paymentPdfUrl}
               frameClassName="w-full rounded-md border"
+              leftContent={
+                businessOptions.length > 1 && (
+                  <>
+                    <Label htmlFor="payment_pdf_alias" className="shrink-0">
+                      Alias
+                    </Label>
+                    <Select
+                      value={paymentAliasId != null ? String(paymentAliasId) : undefined}
+                      onValueChange={(v) => setPaymentAliasId(Number(v))}
+                    >
+                      <SelectTrigger id="payment_pdf_alias" className="w-56">
+                        <SelectValue placeholder="Select company identity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {businessOptions.map((b) => (
+                          <SelectItem key={b.business_id} value={String(b.business_id)}>
+                            {b.business_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )
+              }
             />
           ) : null}
         </DialogContent>
@@ -391,7 +475,7 @@ export function CompanyOverviewView({
         open={billPdfLoading || billPdfUrl !== null || billPdfError !== null}
         onOpenChange={(open) => !open && closeBillPdf()}
       >
-        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-5xl flex-col sm:max-w-5xl">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Tagihan</DialogTitle>
           </DialogHeader>
@@ -400,7 +484,35 @@ export function CompanyOverviewView({
           ) : billPdfError ? (
             <p className="py-8 text-center text-sm text-destructive">{billPdfError}</p>
           ) : billPdfUrl ? (
-            <PdfPreviewFrame title="Bill PDF" url={billPdfUrl} frameClassName="w-full rounded-md border" />
+            <PdfPreviewFrame
+              title="Bill PDF"
+              url={billPdfUrl}
+              frameClassName="w-full rounded-md border"
+              leftContent={
+                businessOptions.length > 1 && (
+                  <>
+                    <Label htmlFor="bill_pdf_alias" className="shrink-0">
+                      Alias
+                    </Label>
+                    <Select
+                      value={billAliasId != null ? String(billAliasId) : undefined}
+                      onValueChange={(v) => setBillAliasId(Number(v))}
+                    >
+                      <SelectTrigger id="bill_pdf_alias" className="w-56">
+                        <SelectValue placeholder="Select company identity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {businessOptions.map((b) => (
+                          <SelectItem key={b.business_id} value={String(b.business_id)}>
+                            {b.business_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )
+              }
+            />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -450,7 +562,7 @@ export function CompanyOverviewView({
           {company.company} - {monthLabel}
         </h1>
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className={`grid gap-3 ${hideCost ? 'grid-cols-3' : 'grid-cols-5'}`}>
           <Card size="sm">
             <CardContent>
               <p className="text-xs text-muted-foreground">Total Nota</p>
@@ -465,22 +577,26 @@ export function CompanyOverviewView({
               </p>
             </CardContent>
           </Card>
-          <Card size="sm">
-            <CardContent>
-              <p className="text-xs text-muted-foreground">Total Cost</p>
-              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-                {formatRupiah(totalCost)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardContent>
-              <p className="text-xs text-muted-foreground">Total Profit</p>
-              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-                {formatRupiah(totalProfit)}
-              </p>
-            </CardContent>
-          </Card>
+          {!hideCost && (
+            <Card size="sm">
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Total Cost</p>
+                <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                  {formatRupiah(totalCost)}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+          {!hideCost && (
+            <Card size="sm">
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Total Profit</p>
+                <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                  {formatRupiah(totalProfit)}
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <Card size="sm" className={settled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
             <CardContent>
               <p className={`text-xs ${settled ? 'text-green-800' : 'text-red-800'}`}>Total Paid</p>
@@ -516,8 +632,8 @@ export function CompanyOverviewView({
                 <col className="w-[130px]" />
                 <col className="w-[85px]" />
                 <col className="w-[110px]" />
-                <col className="w-[180px]" />
-                <col className="w-[110px]" />
+                {!hideCost && <col className="w-[180px]" />}
+                {!hideCost && <col className="w-[110px]" />}
                 <col />
                 <col className="w-10" />
               </colgroup>
@@ -526,8 +642,8 @@ export function CompanyOverviewView({
                   <TableHead className="pl-3 font-bold">Nota Number</TableHead>
                   <TableHead className="font-bold">Date</TableHead>
                   <TableHead className="text-right font-bold">Total Bill</TableHead>
-                  <TableHead className="text-right font-bold">Cost</TableHead>
-                  <TableHead className="text-right font-bold">Profit</TableHead>
+                  {!hideCost && <TableHead className="text-right font-bold">Cost</TableHead>}
+                  {!hideCost && <TableHead className="text-right font-bold">Profit</TableHead>}
                   <TableHead className="font-bold">Notes</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -544,19 +660,23 @@ export function CompanyOverviewView({
                     <TableCell className="whitespace-nowrap text-right">
                       {formatRupiah(totalBillOf(n))}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-right leading-tight">
-                      <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
-                        <span>Cost</span>
-                        <span className="text-center">:</span>
-                        <span>{formatRupiah(n.total_cost)}</span>
-                        <span>Tax</span>
-                        <span className="text-center">:</span>
-                        <span>{formatRupiah(pajakCostOf(n))}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right">
-                      {formatRupiah(n.total_price - n.total_cost)}
-                    </TableCell>
+                    {!hideCost && (
+                      <TableCell className="whitespace-nowrap text-right leading-tight">
+                        <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                          <span>Cost</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(n.total_cost)}</span>
+                          <span>Tax</span>
+                          <span className="text-center">:</span>
+                          <span>{formatRupiah(pajakCostOf(n))}</span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {!hideCost && (
+                      <TableCell className="whitespace-nowrap text-right">
+                        {formatRupiah(n.total_price - n.total_cost)}
+                      </TableCell>
+                    )}
                     <TableCell className="whitespace-normal break-words">{n.notes ?? '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
@@ -704,7 +824,7 @@ export function CompanyOverviewView({
         </Button>
       </div>
 
-      <div className="grid grid-cols-5 gap-3">
+      <div className={`grid gap-3 ${hideCost ? 'grid-cols-4' : 'grid-cols-5'}`}>
         <Card size="sm">
           <CardContent>
             <p className="text-xs text-muted-foreground">Total Nota</p>
@@ -722,17 +842,19 @@ export function CompanyOverviewView({
             </p>
           </CardContent>
         </Card>
-        <Card size="sm">
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Profit</p>
-            <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-              {formatRupiah(totalProfit)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Cost: {formatRupiah(totalCost)}
-            </p>
-          </CardContent>
-        </Card>
+        {!hideCost && (
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Profit</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(totalProfit)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Cost: {formatRupiah(totalCost)}
+              </p>
+            </CardContent>
+          </Card>
+        )}
         <Card size="sm" className="border-green-200 bg-green-50">
           <CardContent>
             <p className="text-xs text-green-800">Total Paid</p>
@@ -798,8 +920,8 @@ export function CompanyOverviewView({
               <col className="w-48" />
               <col className="w-20" />
               <col className="w-32" />
-              <col className="w-36" />
-              <col className="w-32" />
+              {!hideCost && <col className="w-36" />}
+              {!hideCost && <col className="w-32" />}
               <col className="w-40" />
               <col className="w-24" />
               <col />
@@ -809,8 +931,8 @@ export function CompanyOverviewView({
                 <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Cost</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Profit</TableHead>
+                {!hideCost && <TableHead className="h-12 bg-panel text-right font-bold">Cost</TableHead>}
+                {!hideCost && <TableHead className="h-12 bg-panel text-right font-bold">Profit</TableHead>}
                 <TableHead className="h-12 bg-panel text-right font-bold">Paid</TableHead>
                 <TableHead className="h-12 bg-panel font-bold">Status</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Actions</TableHead>
@@ -819,7 +941,7 @@ export function CompanyOverviewView({
             <TableBody>
               {companies.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={hideCost ? 6 : 8} className="h-24 text-center text-muted-foreground">
                     No nota found for {monthLabel}.
                   </TableCell>
                 </TableRow>
@@ -843,19 +965,23 @@ export function CompanyOverviewView({
                       <TableCell className="text-right">
                         {formatRupiah(company.totalBill + companyPajakCost)}
                       </TableCell>
-                      <TableCell className="text-right text-xs leading-tight">
-                        <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
-                          <span>Cost</span>
-                          <span className="text-center">:</span>
-                          <span>{formatRupiah(companyCost)}</span>
-                          <span>Tax</span>
-                          <span className="text-center">:</span>
-                          <span>{formatRupiah(companyPajakCost)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatRupiah(company.totalBill - companyCost)}
-                      </TableCell>
+                      {!hideCost && (
+                        <TableCell className="text-right text-xs leading-tight">
+                          <div className="ml-4 inline-grid grid-cols-[auto_auto_auto] gap-x-1">
+                            <span>Cost</span>
+                            <span className="text-center">:</span>
+                            <span>{formatRupiah(companyCost)}</span>
+                            <span>Tax</span>
+                            <span className="text-center">:</span>
+                            <span>{formatRupiah(companyPajakCost)}</span>
+                          </div>
+                        </TableCell>
+                      )}
+                      {!hideCost && (
+                        <TableCell className="text-right">
+                          {formatRupiah(company.totalBill - companyCost)}
+                        </TableCell>
+                      )}
                       <TableCell className="whitespace-normal text-right text-xs leading-tight">
                         <div>{formatRupiah(company.totalPaid)}</div>
                         {company.totalUnpaid > 0 && (

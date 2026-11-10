@@ -1,5 +1,6 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import type { AppOutletContext } from '@/components/AppLayout'
 import { CustomerDialog } from '@/components/CustomerDialog'
 import { CustomerHistoryDialog } from '@/components/CustomerHistoryDialog'
 import {
@@ -20,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SortableTableHead } from '@/components/SortableTableHead'
+import { hideFinancials } from '@/lib/access'
 import { formatRupiah } from '@/lib/currency'
 import { Input } from '@/components/ui/input'
 import {
@@ -43,6 +46,8 @@ type CustomerSortKey =
   | 'total_profit'
 
 export function CustomerPage() {
+  const { user } = useOutletContext<AppOutletContext>()
+  const hideCost = hideFinancials(user.role)
   const { data: customers = [], isLoading: loading } = useCustomersQuery()
   const deleteMutation = useDeleteCustomerMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -122,27 +127,29 @@ export function CustomerPage() {
             <SortableTableHead active={sortKey === 'phone_number'} dir={sortDir} onClick={() => toggle('phone_number')}>
               Phone
             </SortableTableHead>
-            <SortableTableHead
-              active={sortKey === 'total_profit'}
-              dir={sortDir}
-              onClick={() => toggle('total_profit')}
-              className="text-left"
-            >
-              Total Profit
-            </SortableTableHead>
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'total_profit'}
+                dir={sortDir}
+                onClick={() => toggle('total_profit')}
+                className="text-left"
+              >
+                Total Profit
+              </SortableTableHead>
+            )}
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 6 : 7} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredCustomers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 6 : 7} className="text-center text-muted-foreground">
                 {search ? 'No matching customers.' : 'No customers yet.'}
               </TableCell>
             </TableRow>
@@ -154,9 +161,11 @@ export function CustomerPage() {
                   <TableCell>{customer.address ?? '-'}</TableCell>
                   <TableCell>{customer.contact_person ?? '-'}</TableCell>
                   <TableCell>{customer.phone_number ?? '-'}</TableCell>
-                  <TableCell className="text-[#3EA768] font-medium">
-                    {formatRupiah(customer.total_revenue - customer.total_cost)}
-                  </TableCell>
+                  {!hideCost && (
+                    <TableCell className="text-[#3EA768] font-medium">
+                      {formatRupiah(customer.total_revenue - customer.total_cost)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

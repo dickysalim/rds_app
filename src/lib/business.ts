@@ -91,6 +91,17 @@ export async function updateBusinessAlias(businessId: number, input: BusinessInp
   return data.business
 }
 
+// Soft delete only -- the alias is flagged inactive and kept (past nota and
+// payment PDFs issued under it keep working), so this never shows up in
+// listBusinessAliases again.
+export async function deleteBusinessAlias(businessId: number): Promise<void> {
+  const res = await apiFetch(`/business/aliases/${businessId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error ?? 'Failed to delete alias')
+  }
+}
+
 export function getBusinessAliasLogoUrl(businessId: number): string {
   return `${API_URL}/business/aliases/${businessId}/logo?t=${Date.now()}`
 }

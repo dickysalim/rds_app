@@ -299,19 +299,20 @@ export async function buildPaymentPdf(
 // Payments are immutable once recorded, so the receipt never changes.
 // In-memory only cache: not worth a server round trip to persist since
 // kwitansi are rarely re-downloaded compared to nota.
-const pdfBlobCache = new Map<number, Blob>()
+const pdfBlobCache = new Map<string, Blob>()
 
 async function getPaymentPdfBlob(
   nota: NotaLike,
   payment: Payment,
   business: Business,
 ): Promise<Blob> {
-  const cached = pdfBlobCache.get(payment.payment_id)
+  const key = `${payment.payment_id}|${business.business_id}`
+  const cached = pdfBlobCache.get(key)
   if (cached) return cached
 
   const doc = await buildPaymentPdf(nota, payment, business)
   const blob = doc.output('blob') as Blob
-  pdfBlobCache.set(payment.payment_id, blob)
+  pdfBlobCache.set(key, blob)
   return blob
 }
 

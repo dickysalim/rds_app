@@ -16,12 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useUpdateUserRoleMutation } from '@/lib/queries'
-import type { AssignableRole, TeamUser } from '@/lib/users'
-
-const ROLE_OPTIONS: { value: AssignableRole; label: string }[] = [
-  { value: 'staff', label: 'Staff' },
-  { value: 'quality_control', label: 'Quality Control' },
-]
+import { ROLE_OPTIONS, type AssignableRole, type TeamUser } from '@/lib/users'
 
 export function EditUserRoleDialog({
   open,
@@ -32,7 +27,7 @@ export function EditUserRoleDialog({
   onOpenChange: (open: boolean) => void
   user: TeamUser | null
 }) {
-  const [role, setRole] = useState<AssignableRole>('staff')
+  const [role, setRole] = useState<AssignableRole>('admin')
   const [error, setError] = useState<string | null>(null)
   const updateMutation = useUpdateUserRoleMutation()
 

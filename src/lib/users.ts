@@ -1,6 +1,11 @@
 import { apiFetch } from '@/lib/api'
 
-export type AssignableRole = 'staff' | 'quality_control'
+export type AssignableRole = 'admin' | 'owner'
+
+export const ROLE_OPTIONS: { value: AssignableRole; label: string }[] = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'owner', label: 'Owner' },
+]
 
 export interface TeamUser {
   user_id: string

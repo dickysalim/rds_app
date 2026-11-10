@@ -1,5 +1,6 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,10 +28,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { AdjustStockDialog } from '@/components/AdjustStockDialog'
+import type { AppOutletContext } from '@/components/AppLayout'
 import { ProductDialog } from '@/components/ProductDialog'
 import { ProductHistoryDialog } from '@/components/ProductHistoryDialog'
 import { SortableTableHead } from '@/components/SortableTableHead'
 import { formatQty, formatRupiah } from '@/lib/currency'
+import { hideFinancials } from '@/lib/access'
 import type { Product } from '@/lib/products'
 import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
 import { useSort } from '@/lib/useSort'
@@ -46,6 +49,8 @@ type ProductSortKey =
   | 'current_stock'
 
 export function ProductPage() {
+  const { user } = useOutletContext<AppOutletContext>()
+  const hideCost = hideFinancials(user.role)
   const { data: products = [], isLoading: loading } = useProductsQuery()
   const deleteMutation = useDeleteProductMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -126,51 +131,59 @@ export function ProductPage() {
             >
               Suggested Price / Unit
             </SortableTableHead>
-            <SortableTableHead
-              active={sortKey === 'cost_price'}
-              dir={sortDir}
-              onClick={() => toggle('cost_price')}
-              className="w-32 text-left"
-            >
-              Cost
-            </SortableTableHead>
-            <SortableTableHead
-              active={sortKey === 'profit_per_unit'}
-              dir={sortDir}
-              onClick={() => toggle('profit_per_unit')}
-              className="w-32 text-left"
-            >
-              Profit
-            </SortableTableHead>
-            <SortableTableHead
-              active={sortKey === 'margin'}
-              dir={sortDir}
-              onClick={() => toggle('margin')}
-              className="w-32 text-left"
-            >
-              Margin
-            </SortableTableHead>
-            <SortableTableHead
-              active={sortKey === 'total_profit'}
-              dir={sortDir}
-              onClick={() => toggle('total_profit')}
-              className="text-left"
-            >
-              Total Profit
-            </SortableTableHead>
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'cost_price'}
+                dir={sortDir}
+                onClick={() => toggle('cost_price')}
+                className="w-32 text-left"
+              >
+                Cost
+              </SortableTableHead>
+            )}
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'profit_per_unit'}
+                dir={sortDir}
+                onClick={() => toggle('profit_per_unit')}
+                className="w-32 text-left"
+              >
+                Profit
+              </SortableTableHead>
+            )}
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'margin'}
+                dir={sortDir}
+                onClick={() => toggle('margin')}
+                className="w-32 text-left"
+              >
+                Margin
+              </SortableTableHead>
+            )}
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'total_profit'}
+                dir={sortDir}
+                onClick={() => toggle('total_profit')}
+                className="text-left"
+              >
+                Total Profit
+              </SortableTableHead>
+            )}
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 5 : 9} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredProducts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 5 : 9} className="text-center text-muted-foreground">
                 {search ? 'No matching products.' : 'No products yet.'}
               </TableCell>
             </TableRow>
@@ -185,20 +198,28 @@ export function ProductPage() {
                     ? `${formatRupiah(product.suggested_price)} / ${product.unit}`
                     : `- / ${product.unit}`}
                 </TableCell>
-                <TableCell>
-                  {product.cost_price != null ? formatRupiah(product.cost_price) : '-'}
-                </TableCell>
-                <TableCell>
-                  {product.suggested_price != null && product.cost_price != null
-                    ? formatRupiah(product.suggested_price - product.cost_price)
-                    : '-'}
-                </TableCell>
-                <TableCell>
-                  {product.suggested_price ? `${Math.round(((product.suggested_price - (product.cost_price ?? 0)) / product.suggested_price) * 100)}%` : '-'}
-                </TableCell>
-                <TableCell className="text-[#3EA768] font-medium">
-                  {formatRupiah(product.total_revenue - product.total_cost)}
-                </TableCell>
+                {!hideCost && (
+                  <TableCell>
+                    {product.cost_price != null ? formatRupiah(product.cost_price) : '-'}
+                  </TableCell>
+                )}
+                {!hideCost && (
+                  <TableCell>
+                    {product.suggested_price != null && product.cost_price != null
+                      ? formatRupiah(product.suggested_price - product.cost_price)
+                      : '-'}
+                  </TableCell>
+                )}
+                {!hideCost && (
+                  <TableCell>
+                    {product.suggested_price ? `${Math.round(((product.suggested_price - (product.cost_price ?? 0)) / product.suggested_price) * 100)}%` : '-'}
+                  </TableCell>
+                )}
+                {!hideCost && (
+                  <TableCell className="text-[#3EA768] font-medium">
+                    {formatRupiah(product.total_revenue - product.total_cost)}
+                  </TableCell>
+                )}
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -18,17 +18,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useCreateUserMutation } from '@/lib/queries'
-import type { AssignableRole } from '@/lib/users'
-
-const ROLE_OPTIONS: { value: AssignableRole; label: string }[] = [
-  { value: 'staff', label: 'Staff' },
-  { value: 'quality_control', label: 'Quality Control' },
-]
+import { ROLE_OPTIONS, type AssignableRole } from '@/lib/users'
 
 export function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [username, setUsername] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState<AssignableRole>('staff')
+  const [role, setRole] = useState<AssignableRole>('admin')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ username: string; password: string } | null>(null)
   const createMutation = useCreateUserMutation()
@@ -36,7 +31,7 @@ export function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   function reset() {
     setUsername('')
     setName('')
-    setRole('staff')
+    setRole('admin')
     setError(null)
     setResult(null)
   }
