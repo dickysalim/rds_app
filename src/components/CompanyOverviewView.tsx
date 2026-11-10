@@ -803,27 +803,22 @@ export function CompanyOverviewView({
         <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
           <Table className="table-fixed text-sm font-normal [&_td]:py-2">
             <colgroup>
+              <col className="w-48" />
+              <col className="w-20" />
+              <col className="w-32" />
+              <col className="w-36" />
+              <col className="w-32" />
               <col className="w-40" />
-              <col className="w-16" />
               <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-24" />
-              <col className="w-44" />
+              <col />
             </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead className="h-12 bg-panel font-bold">Company</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Nota Count</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Sub Total</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Pajak Cost</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Total Bill</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Cost</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Profit</TableHead>
-                <TableHead className="h-12 bg-panel text-right font-bold">Unpaid</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Paid</TableHead>
                 <TableHead className="h-12 bg-panel font-bold">Status</TableHead>
                 <TableHead className="h-12 bg-panel text-right font-bold">Actions</TableHead>
@@ -832,7 +827,7 @@ export function CompanyOverviewView({
             <TableBody>
               {companies.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                     No nota found for {monthLabel}.
                   </TableCell>
                 </TableRow>
@@ -853,19 +848,24 @@ export function CompanyOverviewView({
                         </div>
                       </TableCell>
                       <TableCell className="text-right">{company.notaCount}</TableCell>
-                      <TableCell className="text-right">{formatRupiah(company.totalBill)}</TableCell>
-                      <TableCell className="text-right">{formatRupiah(companyPajakCost)}</TableCell>
                       <TableCell className="text-right">
                         {formatRupiah(company.totalBill + companyPajakCost)}
                       </TableCell>
-                      <TableCell className="text-right">{formatRupiah(companyCost)}</TableCell>
+                      <TableCell className="text-right text-xs leading-tight">
+                        <div>Cost: {formatRupiah(companyCost)}</div>
+                        <div>Tax: {formatRupiah(companyPajakCost)}</div>
+                      </TableCell>
                       <TableCell className="text-right">
                         {formatRupiah(company.totalBill - companyCost)}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {formatRupiah(company.totalUnpaid)}
+                      <TableCell className="whitespace-normal text-right text-xs leading-tight">
+                        <div>{formatRupiah(company.totalPaid)}</div>
+                        {company.totalUnpaid > 0 && (
+                          <div className="text-muted-foreground">
+                            ({formatRupiah(company.totalUnpaid)} unpaid)
+                          </div>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">{formatRupiah(company.totalPaid)}</TableCell>
                       <TableCell>
                         <span className={statusPillClass(companyState)}>{statusLabel(companyState)}</span>
                       </TableCell>
