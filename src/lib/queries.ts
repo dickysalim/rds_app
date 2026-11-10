@@ -21,17 +21,14 @@ import {
 } from '@/lib/customers'
 import { invalidateLogoCache } from '@/lib/logoCache'
 import {
-  createBillPayment,
   createNota,
   getNota,
   getNotaDateRange,
-  listBillPayments,
   listNota,
   voidNota,
   updateNota,
   type NotaUpdateInput,
   type NotaInput,
-  type PaymentInput,
 } from '@/lib/nota'
 import { clearAllNotaPdfCaches, invalidateNotaPdfCache } from '@/lib/notaPdf'
 import { clearPaymentPdfCache } from '@/lib/paymentPdf'
@@ -372,25 +369,3 @@ export function useVoidNotaMutation() {
   })
 }
 
-// --- Payments ---------------------------------------------------------
-// A payment belongs to the bill (customer + month), not a single nota.
-
-export function usePaymentsQuery(customerId: number | null, year: number, month: number) {
-  return useQuery({
-    queryKey: queryKeys.payments(customerId ?? -1, year, month),
-    queryFn: () => listBillPayments(customerId as number, year, month),
-    enabled: customerId !== null,
-  })
-}
-
-export function useCreatePaymentMutation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ customerId, input }: { customerId: number; input: PaymentInput }) =>
-      createBillPayment(customerId, input),
-    onSuccess: (_data, { customerId, input }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments(customerId, input.year, input.month) })
-      queryClient.invalidateQueries({ queryKey: ['nota', 'list'] })
-    },
-  })
-}

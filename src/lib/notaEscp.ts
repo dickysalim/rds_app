@@ -426,12 +426,3 @@ export function printNotaEscpViaBrowser(
   }
 }
 
-export function downloadNotaEscp(nota: NotaDetail, business: Business, docType: NotaDocType = 'nota_pembelian'): void {
-  const bytes = buildNotaEscp(nota, business, docType)
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${nota.nota_number.replace(/\//g, '-')}.prn`
-  a.click()
-  URL.revokeObjectURL(url)
-}
