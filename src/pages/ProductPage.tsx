@@ -236,9 +236,11 @@ export function ProductPage() {
                       >
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setHistoryProduct(product)}>
-                        History
-                      </DropdownMenuItem>
+                      {!hideCost && (
+                        <DropdownMenuItem onClick={() => setHistoryProduct(product)}>
+                          History
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setAdjustingProduct(product)}>
                         Adjust Stock
                       </DropdownMenuItem>

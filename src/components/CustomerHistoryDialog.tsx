@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -26,11 +27,18 @@ export function CustomerHistoryDialog({
   customerId: number | null
   companyName: string | null
 }) {
-  const { data: history = [], isLoading } = useQuery({
+  const { data: history = [], isLoading, refetch } = useQuery({
     queryKey: ['customer-history', customerId],
     queryFn: () => getCustomerHistory(customerId!),
     enabled: open && customerId != null,
   })
+
+  // The global query cache's staleTime would otherwise show a cached
+  // snapshot on reopen -- history must always reflect the latest edits.
+  useEffect(() => {
+    if (open && customerId != null) refetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, customerId])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

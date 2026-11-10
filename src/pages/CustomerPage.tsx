@@ -182,9 +182,11 @@ export function CustomerPage() {
                         >
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setHistoryCustomer(customer)}>
-                          History
-                        </DropdownMenuItem>
+                        {!hideCost && (
+                          <DropdownMenuItem onClick={() => setHistoryCustomer(customer)}>
+                            History
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           variant="destructive"
                           onClick={() => setDeletingCustomer(customer)}
