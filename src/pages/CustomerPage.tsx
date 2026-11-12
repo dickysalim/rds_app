@@ -21,9 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Pagination } from '@/components/Pagination'
 import { SortableTableHead } from '@/components/SortableTableHead'
 import { hideFinancials } from '@/lib/access'
 import { formatRupiah } from '@/lib/currency'
+import { usePagination } from '@/lib/usePagination'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -83,6 +85,8 @@ export function CustomerPage() {
     }),
     (row, key) => (key === 'total_profit' ? row.total_revenue - row.total_cost : (row[key] ?? '')),
   )
+
+  const { page, setPage, pageCount, paged: pagedCustomers } = usePagination(filteredCustomers)
 
   return (
     <div className="space-y-4">
@@ -154,7 +158,7 @@ export function CustomerPage() {
               </TableCell>
             </TableRow>
           ) : (
-            filteredCustomers.map((customer) => (
+            pagedCustomers.map((customer) => (
                 <TableRow key={customer.customer_id}>
                   <TableCell>{String(customer.customer_id).padStart(3, '0')}</TableCell>
                   <TableCell>{customer.company_name}</TableCell>
@@ -202,6 +206,7 @@ export function CustomerPage() {
         </TableBody>
       </Table>
 </div>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
       <CustomerDialog
         open={dialogOpen}

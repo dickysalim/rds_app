@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/table'
 import { AdjustStockDialog } from '@/components/AdjustStockDialog'
 import type { AppOutletContext } from '@/components/AppLayout'
+import { Pagination } from '@/components/Pagination'
 import { ProductDialog } from '@/components/ProductDialog'
 import { ProductHistoryDialog } from '@/components/ProductHistoryDialog'
 import { SortableTableHead } from '@/components/SortableTableHead'
@@ -36,6 +37,7 @@ import { formatQty, formatRupiah } from '@/lib/currency'
 import { hideFinancials } from '@/lib/access'
 import type { Product } from '@/lib/products'
 import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
+import { usePagination } from '@/lib/usePagination'
 import { useSort } from '@/lib/useSort'
 
 type ProductSortKey =
@@ -84,6 +86,8 @@ export function ProductPage() {
       return row[key]
     },
   )
+
+  const { page, setPage, pageCount, paged: pagedProducts } = usePagination(filteredProducts)
 
   return (
     <div className="space-y-4">
@@ -188,7 +192,7 @@ export function ProductPage() {
               </TableCell>
             </TableRow>
           ) : (
-            filteredProducts.map((product) => (
+            pagedProducts.map((product) => (
               <TableRow key={product.sku_id}>
                 <TableCell>{String(product.sku_id).padStart(3, '0')}</TableCell>
                 <TableCell>{product.sku_name}</TableCell>
@@ -259,6 +263,7 @@ export function ProductPage() {
         </TableBody>
       </Table>
 </div>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
       <ProductDialog
         open={dialogOpen}

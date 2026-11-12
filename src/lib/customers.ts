@@ -13,7 +13,7 @@ export interface Customer {
 }
 
 export async function listCustomers(): Promise<Customer[]> {
-  const res = await apiFetch('/customers?limit=50')
+  const res = await apiFetch('/customers?limit=500')
   if (!res.ok) throw new Error('Failed to load customers')
   const data = (await res.json()) as { customers: Customer[] }
   return data.customers

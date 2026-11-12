@@ -14,7 +14,7 @@ export interface Product {
 }
 
 export async function listProducts(): Promise<Product[]> {
-  const res = await apiFetch('/products?limit=50')
+  const res = await apiFetch('/products?limit=500')
   if (!res.ok) throw new Error('Failed to load products')
   const data = (await res.json()) as { products: Product[] }
   return data.products
