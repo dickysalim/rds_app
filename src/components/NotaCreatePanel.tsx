@@ -189,7 +189,7 @@ export function NotaCreatePanel({
   function missingCostPrice(row: ItemRow): boolean {
     if (row.skuId === null) return false
     const product = products.find((p) => p.sku_id === row.skuId)
-    return !!product && product.cost_price == null
+    return !!product && !product.has_cost_price
   }
 
   const anyMissingCostPrice = items.some(missingCostPrice)

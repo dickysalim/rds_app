@@ -11,6 +11,10 @@ export interface Product {
   total_revenue: number
   total_cost: number
   current_stock: number | null
+  // Survives redaction for admin/staging_admin (whose cost_price comes back
+  // null even when the owner set one) -- use this, not cost_price, to check
+  // whether a product's cost data is complete.
+  has_cost_price: boolean
 }
 
 export async function listProducts(): Promise<Product[]> {
