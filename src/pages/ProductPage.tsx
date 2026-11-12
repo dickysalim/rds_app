@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, PrinterIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
@@ -27,17 +27,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { AdjustStockDialog } from '@/components/AdjustStockDialog'
 import type { AppOutletContext } from '@/components/AppLayout'
 import { Pagination } from '@/components/Pagination'
 import { ProductDialog } from '@/components/ProductDialog'
 import { ProductHistoryDialog } from '@/components/ProductHistoryDialog'
 import { SortableTableHead } from '@/components/SortableTableHead'
+import { Card, CardContent } from '@/components/ui/card'
 import { formatQty, formatRupiah } from '@/lib/currency'
 import { hideFinancials } from '@/lib/access'
 import type { Product } from '@/lib/products'
-import { useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
+import { useBusinessQuery, useDeleteProductMutation, useProductsQuery } from '@/lib/queries'
 import { usePagination } from '@/lib/usePagination'
+import { previewStockOpnamePdfUrl } from '@/lib/stockOpnamePdf'
 import { useSort } from '@/lib/useSort'
 
 type ProductSortKey =
@@ -45,15 +49,15 @@ type ProductSortKey =
   | 'sku_name'
   | 'suggested_price'
   | 'cost_price'
-  | 'profit_per_unit'
-  | 'margin'
-  | 'total_profit'
+  | 'revenue_value'
+  | 'stock_value'
   | 'current_stock'
 
 export function ProductPage() {
   const { user } = useOutletContext<AppOutletContext>()
   const hideCost = hideFinancials(user.role)
   const { data: products = [], isLoading: loading } = useProductsQuery()
+  const { data: business } = useBusinessQuery()
   const deleteMutation = useDeleteProductMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -61,6 +65,9 @@ export function ProductPage() {
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
+  const [opnamePdfUrl, setOpnamePdfUrl] = useState<string | null>(null)
+  const [opnamePdfLoading, setOpnamePdfLoading] = useState(false)
+  const [opnamePdfError, setOpnamePdfError] = useState<string | null>(null)
   const { sortKey, sortDir, toggle, applySort } = useSort<Product, ProductSortKey>('sku_id', 'desc')
 
   function handleSaved() {
@@ -73,21 +80,48 @@ export function ProductPage() {
     setDeletingProduct(null)
   }
 
+  function closeOpnamePdf() {
+    if (opnamePdfUrl) URL.revokeObjectURL(opnamePdfUrl)
+    setOpnamePdfUrl(null)
+    setOpnamePdfError(null)
+  }
+
+  async function handlePrintStockOpname() {
+    setOpnamePdfLoading(true)
+    setOpnamePdfError(null)
+    try {
+      if (!business) throw new Error('Set up Business Settings first')
+      const url = await previewStockOpnamePdfUrl(products, business)
+      setOpnamePdfUrl(url)
+    } catch (err) {
+      setOpnamePdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
+    } finally {
+      setOpnamePdfLoading(false)
+    }
+  }
+
   const filteredProducts = applySort(
     products.filter((p) => p.sku_name.toLowerCase().includes(search.trim().toLowerCase())),
     (row, key) => {
       if (key === 'suggested_price') return row.suggested_price ?? 0
       if (key === 'cost_price') return row.cost_price ?? 0
-      if (key === 'profit_per_unit') return (row.suggested_price ?? 0) - (row.cost_price ?? 0)
-      if (key === 'margin')
-        return row.suggested_price ? ((row.suggested_price - (row.cost_price ?? 0)) / row.suggested_price) : 0
-      if (key === 'total_profit') return row.total_revenue - row.total_cost
+      if (key === 'revenue_value') return (row.current_stock ?? 0) * (row.suggested_price ?? 0)
+      if (key === 'stock_value') return (row.current_stock ?? 0) * (row.cost_price ?? 0)
       if (key === 'current_stock') return row.current_stock ?? 0
       return row[key]
     },
   )
 
   const { page, setPage, pageCount, paged: pagedProducts } = usePagination(filteredProducts)
+
+  const stockValueTotal = filteredProducts.reduce(
+    (sum, p) => sum + (p.current_stock ?? 0) * (p.suggested_price ?? 0),
+    0,
+  )
+  const stockCostValueTotal = filteredProducts.reduce(
+    (sum, p) => sum + (p.current_stock ?? 0) * (p.cost_price ?? 0),
+    0,
+  )
 
   return (
     <div className="space-y-4">
@@ -100,14 +134,46 @@ export function ProductPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-80"
         />
-        <Button
-          onClick={() => {
-            setEditingProduct(null)
-            setDialogOpen(true)
-          }}
-        >
-          + Add New Product
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handlePrintStockOpname}
+            disabled={opnamePdfLoading}
+          >
+            <PrinterIcon />
+            {opnamePdfLoading ? 'Generating…' : 'Print Stock Opname'}
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingProduct(null)
+              setDialogOpen(true)
+            }}
+          >
+            + Add New Product
+          </Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {!hideCost && (
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Revenue Value</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(stockValueTotal)}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {!hideCost && (
+          <Card size="sm">
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Cost Value</p>
+              <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
+                {formatRupiah(stockCostValueTotal)}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
       <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
 <Table>
@@ -131,10 +197,20 @@ export function ProductPage() {
               active={sortKey === 'suggested_price'}
               dir={sortDir}
               onClick={() => toggle('suggested_price')}
-              className="min-w-56 text-left"
+              className="w-36 text-left"
             >
-              Suggested Price / Unit
+              Price / Unit
             </SortableTableHead>
+            {!hideCost && (
+              <SortableTableHead
+                active={sortKey === 'revenue_value'}
+                dir={sortDir}
+                onClick={() => toggle('revenue_value')}
+                className="text-left"
+              >
+                Revenue Value
+              </SortableTableHead>
+            )}
             {!hideCost && (
               <SortableTableHead
                 active={sortKey === 'cost_price'}
@@ -147,32 +223,12 @@ export function ProductPage() {
             )}
             {!hideCost && (
               <SortableTableHead
-                active={sortKey === 'profit_per_unit'}
+                active={sortKey === 'stock_value'}
                 dir={sortDir}
-                onClick={() => toggle('profit_per_unit')}
-                className="w-32 text-left"
-              >
-                Profit
-              </SortableTableHead>
-            )}
-            {!hideCost && (
-              <SortableTableHead
-                active={sortKey === 'margin'}
-                dir={sortDir}
-                onClick={() => toggle('margin')}
-                className="w-32 text-left"
-              >
-                Margin
-              </SortableTableHead>
-            )}
-            {!hideCost && (
-              <SortableTableHead
-                active={sortKey === 'total_profit'}
-                dir={sortDir}
-                onClick={() => toggle('total_profit')}
+                onClick={() => toggle('stock_value')}
                 className="text-left"
               >
-                Total Profit
+                Cost Value
               </SortableTableHead>
             )}
             <TableHead className="w-10" />
@@ -181,13 +237,13 @@ export function ProductPage() {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={hideCost ? 5 : 9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 5 : 8} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filteredProducts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={hideCost ? 5 : 9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 5 : 8} className="text-center text-muted-foreground">
                 {search ? 'No matching products.' : 'No products yet.'}
               </TableCell>
             </TableRow>
@@ -204,24 +260,21 @@ export function ProductPage() {
                 </TableCell>
                 {!hideCost && (
                   <TableCell>
-                    {product.cost_price != null ? formatRupiah(product.cost_price) : '-'}
-                  </TableCell>
-                )}
-                {!hideCost && (
-                  <TableCell>
-                    {product.suggested_price != null && product.cost_price != null
-                      ? formatRupiah(product.suggested_price - product.cost_price)
+                    {product.current_stock != null && product.suggested_price != null
+                      ? formatRupiah(product.current_stock * product.suggested_price)
                       : '-'}
                   </TableCell>
                 )}
                 {!hideCost && (
                   <TableCell>
-                    {product.suggested_price ? `${Math.round(((product.suggested_price - (product.cost_price ?? 0)) / product.suggested_price) * 100)}%` : '-'}
+                    {product.cost_price != null ? formatRupiah(product.cost_price) : '-'}
                   </TableCell>
                 )}
                 {!hideCost && (
-                  <TableCell className="text-[#3EA768] font-medium">
-                    {formatRupiah(product.total_revenue - product.total_cost)}
+                  <TableCell>
+                    {product.current_stock != null && product.cost_price != null
+                      ? formatRupiah(product.current_stock * product.cost_price)
+                      : '-'}
                   </TableCell>
                 )}
                 <TableCell>
@@ -302,6 +355,28 @@ export function ProductPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={opnamePdfLoading || opnamePdfUrl !== null || opnamePdfError !== null}
+        onOpenChange={(open) => !open && closeOpnamePdf()}
+      >
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Stock Opname</DialogTitle>
+          </DialogHeader>
+          {opnamePdfLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
+          ) : opnamePdfError ? (
+            <p className="py-8 text-center text-sm text-destructive">{opnamePdfError}</p>
+          ) : opnamePdfUrl ? (
+            <PdfPreviewFrame
+              title="Stock Opname"
+              url={opnamePdfUrl}
+              frameClassName="w-full rounded-md border"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

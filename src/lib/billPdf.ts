@@ -187,7 +187,7 @@ export async function buildBillPdf(
   const footerTop = PAGE_HEIGHT - MARGIN - 21
 
   let finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 7
-  if (hasPayment && finalY + 6 > footerTop - 6) {
+  if (finalY + 6 > footerTop - 6) {
     doc.addPage()
     finalY = MARGIN + 7
   }
@@ -197,6 +197,23 @@ export async function buildBillPdf(
   doc.setFontSize(13)
   doc.text('TOTAL', labelX, finalY)
   doc.text(fmt(total), CONTENT_RIGHT, finalY, { align: 'right' })
+
+  // Signature spots (bottom left), same design and row as the nota: two
+  // boxes side by side -- "Hormat Kami," and "Tanda Terima," -- each a
+  // label with a blank gap for the physical signature, closed by a line.
+  const sigBoxWidth = 45
+  const sigGap = 10
+  const sigY = footerTop
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(11)
+  doc.text('Hormat Kami,', MARGIN, sigY)
+  const sigBox2X = MARGIN + sigBoxWidth + sigGap
+  doc.text('Tanda Terima,', sigBox2X, sigY)
+  const sigLineY = sigY + 16
+  doc.setDrawColor(0)
+  doc.setLineWidth(0.25)
+  doc.line(MARGIN, sigLineY, MARGIN + sigBoxWidth, sigLineY)
+  doc.line(sigBox2X, sigLineY, sigBox2X + sigBoxWidth, sigLineY)
 
   if (hasPayment) {
     let payY = footerTop

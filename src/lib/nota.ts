@@ -18,6 +18,7 @@ export interface NotaListItem {
   status: string
   pajak_name: string | null
   pajak_percentage: number | null
+  created_by: string | null
 }
 
 export function pajakCostOf(n: Pick<NotaListItem, 'total_price' | 'pajak_percentage'>): number {

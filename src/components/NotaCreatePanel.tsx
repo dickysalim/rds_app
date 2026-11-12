@@ -186,6 +186,16 @@ export function NotaCreatePanel({
     return product?.current_stock != null && Number(row.qty) > product.current_stock
   }
 
+  function missingCostPrice(row: ItemRow): boolean {
+    if (row.skuId === null) return false
+    const product = products.find((p) => p.sku_id === row.skuId)
+    return !!product && product.cost_price == null
+  }
+
+  const anyMissingCostPrice = items.some(missingCostPrice)
+  const INCOMPLETE_PRODUCT_DATA_ERROR =
+    'Data produk tidak lengkap, hubungi Owner untuk melengkap data produk'
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -200,6 +210,10 @@ export function NotaCreatePanel({
     }
     if (items.some(exceedsStock)) {
       setError('An item quantity exceeds current stock')
+      return
+    }
+    if (anyMissingCostPrice) {
+      setError(INCOMPLETE_PRODUCT_DATA_ERROR)
       return
     }
     if (!!pajakName !== !!pajakPercentage) {
@@ -224,6 +238,10 @@ export function NotaCreatePanel({
     }
     if (items.some(exceedsStock)) {
       setError('An item quantity exceeds current stock')
+      return
+    }
+    if (anyMissingCostPrice) {
+      setError(INCOMPLETE_PRODUCT_DATA_ERROR)
       return
     }
     if (!!pajakName !== !!pajakPercentage) {
@@ -316,7 +334,12 @@ export function NotaCreatePanel({
           <h1 className="text-2xl font-semibold tracking-tight">Add Nota</h1>
           <p className="text-sm text-muted-foreground">Create a new nota for a customer.</p>
         </div>
-        <Button type="submit" form="nota-form" size="lg" disabled={loading || anyExceedsStock}>
+        <Button
+          type="submit"
+          form="nota-form"
+          size="lg"
+          disabled={loading || anyExceedsStock || anyMissingCostPrice}
+        >
           {loading ? 'Saving…' : 'Save'}
         </Button>
       </div>
@@ -626,6 +649,11 @@ export function NotaCreatePanel({
                         </button>
                       ))}
                     </div>
+                  )}
+                  {missingCostPrice(row) && (
+                    <p className="mt-0.5 text-xs font-medium text-destructive">
+                      Data produk tidak lengkap, hubungi Owner untuk melengkap data produk
+                    </p>
                   )}
                 </div>
                 <Select

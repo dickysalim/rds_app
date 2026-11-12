@@ -290,19 +290,20 @@ export function NotaPage() {
             {!hideCost && <TableHead className="text-right">Cost</TableHead>}
             {!hideCost && <TableHead className="text-right">Profit</TableHead>}
             <TableHead>Status</TableHead>
+            <TableHead>Created By</TableHead>
             <TableHead className="w-8" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={hideCost ? 7 : 9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 8 : 10} className="text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
           ) : nota.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={hideCost ? 7 : 9} className="text-center text-muted-foreground">
+              <TableCell colSpan={hideCost ? 8 : 10} className="text-center text-muted-foreground">
                 No nota yet.
               </TableCell>
             </TableRow>
@@ -341,6 +342,7 @@ export function NotaPage() {
                     <TableCell>
                       <span className={statusPillClass(n.status)}>{statusLabel(n.status)}</span>
                     </TableCell>
+                    <TableCell>{n.created_by ?? '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -379,7 +381,7 @@ export function NotaPage() {
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={hideCost ? 7 : 9} className="bg-panel pl-14">
+                      <TableCell colSpan={hideCost ? 8 : 10} className="bg-panel pl-14">
                         {!payments ? (
                           <p className="py-2 text-sm text-muted-foreground">Loading payments…</p>
                         ) : payments.length === 0 ? (

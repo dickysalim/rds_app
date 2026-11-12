@@ -634,6 +634,7 @@ export function CompanyOverviewView({
                 <col className="w-[110px]" />
                 {!hideCost && <col className="w-[180px]" />}
                 {!hideCost && <col className="w-[110px]" />}
+                <col className="w-[100px]" />
                 <col />
                 <col className="w-10" />
               </colgroup>
@@ -644,6 +645,7 @@ export function CompanyOverviewView({
                   <TableHead className="text-right font-bold">Total Bill</TableHead>
                   {!hideCost && <TableHead className="text-right font-bold">Cost</TableHead>}
                   {!hideCost && <TableHead className="text-right font-bold">Profit</TableHead>}
+                  <TableHead className="font-bold">Created By</TableHead>
                   <TableHead className="font-bold">Notes</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -677,6 +679,7 @@ export function CompanyOverviewView({
                         {formatRupiah(n.total_price - n.total_cost)}
                       </TableCell>
                     )}
+                    <TableCell className="whitespace-nowrap">{n.created_by ?? '-'}</TableCell>
                     <TableCell className="whitespace-normal break-words">{n.notes ?? '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>

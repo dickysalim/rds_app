@@ -12,6 +12,11 @@ import { printRawEscp } from '@/lib/qzPrint'
 // 10 cpi (pica) on 8" printable width = 80 columns.
 const COLS = 80
 
+// Physical sheet length of the user's continuous (fanfold) dot-matrix
+// paper -- the form feed always advances exactly this far, landing on the
+// next sheet's top-of-form regardless of how much the nota's content fills.
+const PAGE_LENGTH_INCHES = 11
+
 const ESC = 0x1b
 const FF = 0x0c
 const CR_LF = [0x0d, 0x0a]
@@ -343,12 +348,14 @@ export function buildNotaEscp(nota: NotaDetail, business: Business, docType: Not
     emit(...CR_LF)
   }
 
-  // Page length in inches (ESC C 0 n, n ≤ 22), set right before the form
-  // feed it governs -- issuing it earlier (before any content) snaps the
-  // print head to top-of-form immediately, eating the first few lines.
-  const totalLines = lines.length + 1 + 2 // top margin + bottom margin
-  const inches = Math.min(22, Math.max(1, Math.ceil(totalLines / 6)))
-  emit(ESC, 0x43, 0x00, inches)
+  // Page length in inches (ESC C 0 n), set right before the form feed it
+  // governs -- issuing it earlier (before any content) snaps the print head
+  // to top-of-form immediately, eating the first few lines. Fixed to the
+  // physical sheet length of the user's 9.5x11" fanfold paper -- sizing it
+  // off the content's own line count instead drifts the form feed away from
+  // the real perforation a little more on every nota, until prints land
+  // mid-sheet instead of at the top of the next one.
+  emit(ESC, 0x43, 0x00, PAGE_LENGTH_INCHES)
   emit(FF) // eject to next page top
 
   return new Uint8Array(bytes)
