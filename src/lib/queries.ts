@@ -57,6 +57,22 @@ import {
   type StockMovementInput,
   type StockMovementUpdateInput,
 } from '@/lib/stockLedger'
+import {
+  createRawMaterial,
+  createRawMaterialMovement,
+  deleteRawMaterial,
+  deleteRawMaterialMovement,
+  listRawMaterialLedger,
+  listRawMaterials,
+  updateRawMaterial,
+  updateRawMaterialMovement,
+  type CreateRawMaterialInput,
+  type RawMaterialInput,
+  type RawMaterialMovementInput,
+  type RawMaterialMovementUpdateInput,
+} from '@/lib/rawMaterial'
+import { listVendors } from '@/lib/vendors'
+import { createPurchaseOrder, type PurchaseOrderInput } from '@/lib/purchaseOrders'
 
 // Logo or business details changed — every cached PDF (client-side and the
 // server-side R2 nota cache) has the old letterhead baked in.
@@ -84,6 +100,9 @@ export const queryKeys = {
   customers: ['customers'] as const,
   products: ['products'] as const,
   stockLedger: ['stock-ledger'] as const,
+  rawMaterials: ['raw-materials'] as const,
+  rawMaterialLedger: ['raw-material-ledger'] as const,
+  vendors: ['vendors'] as const,
   users: ['users'] as const,
   notaList: (params?: Record<string, unknown>) => ['nota', 'list', params ?? {}] as const,
   notaDetail: (notaId: number) => ['nota', 'detail', notaId] as const,
@@ -263,7 +282,106 @@ export function useDeleteProductMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (skuId: number) => deleteProduct(skuId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.products }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+      // Deleting a product cascades to deactivate its stock_ledger rows
+      // (DB trigger) -- refetch so they disappear from Stock Management too.
+      queryClient.invalidateQueries({ queryKey: queryKeys.stockLedger })
+    },
+  })
+}
+
+// --- Raw materials -------------------------------------------------------
+
+export function useRawMaterialsQuery() {
+  return useQuery({ queryKey: queryKeys.rawMaterials, queryFn: listRawMaterials })
+}
+
+export function useCreateRawMaterialMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateRawMaterialInput) => createRawMaterial(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials }),
+  })
+}
+
+export function useUpdateRawMaterialMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ rawMatId, input }: { rawMatId: number; input: RawMaterialInput }) =>
+      updateRawMaterial(rawMatId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials }),
+  })
+}
+
+export function useDeleteRawMaterialMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (rawMatId: number) => deleteRawMaterial(rawMatId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+      // Deleting a raw material cascades to deactivate its ledger rows
+      // (DB trigger) -- refetch so they disappear from Raw Mat. Management too.
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+    },
+  })
+}
+
+// --- Raw material ledger --------------------------------------------------
+
+export function useRawMaterialLedgerQuery() {
+  return useQuery({ queryKey: queryKeys.rawMaterialLedger, queryFn: listRawMaterialLedger })
+}
+
+export function useCreateRawMaterialMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: RawMaterialMovementInput) => createRawMaterialMovement(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+    },
+  })
+}
+
+export function useUpdateRawMaterialMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: RawMaterialMovementUpdateInput }) =>
+      updateRawMaterialMovement(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+    },
+  })
+}
+
+export function useDeleteRawMaterialMovementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => deleteRawMaterialMovement(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+    },
+  })
+}
+
+// --- Vendors / Purchase orders ---------------------------------------------
+
+export function useVendorsQuery() {
+  return useQuery({ queryKey: queryKeys.vendors, queryFn: listVendors })
+}
+
+export function useCreatePurchaseOrderMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PurchaseOrderInput) => createPurchaseOrder(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+      queryClient.invalidateQueries({ queryKey: queryKeys.vendors })
+    },
   })
 }
 

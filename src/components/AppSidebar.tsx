@@ -1,4 +1,4 @@
-import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, FileBarChart, FilePlus, UserCog, UsersRound, Tag } from 'lucide-react'
+import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, UserCog, UsersRound, Tag, Wheat, ClipboardList } from 'lucide-react'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -21,18 +21,21 @@ import type { AuthUser } from '@/lib/auth'
 import { useNavGuard } from '@/lib/nav-guard'
 import { useBusinessQuery } from '@/lib/queries'
 
-const operationItems = [
+const salesItems = [
   { title: 'Nota', url: '/nota', icon: Receipt },
-  { title: 'Stock Management', url: '/stock-management', icon: Boxes },
   { title: 'Customer', url: '/customer', icon: Users },
+]
+
+const operationItems = [
+  { title: 'Stock Management', url: '/stock-management', icon: Boxes },
   { title: 'Product', url: '/product', icon: Package },
+  { title: 'Raw Mat. Management', url: '/raw-mat-management', icon: ClipboardList },
+  { title: 'Raw Material', url: '/raw-material', icon: Wheat },
 ]
 
 const financeItems = [
   { title: 'Revenue', url: '/revenue', icon: TrendingUp },
   { title: 'Expense', url: '/expense', icon: TrendingDown },
-  { title: 'Request Expense', url: '/request-expense', icon: FilePlus },
-  { title: 'Report', url: '/report', icon: FileBarChart },
 ]
 
 const settingsItems = [
@@ -82,6 +85,7 @@ export function AppSidebar({
   const { guardRef } = useNavGuard()
   const { data: business } = useBusinessQuery()
 
+  const visibleSalesItems = salesItems.filter((item) => isPathAllowed(user.role, item.url))
   const visibleOperationItems = operationItems.filter((item) => isPathAllowed(user.role, item.url))
   const visibleFinanceItems = financeItems.filter((item) => isPathAllowed(user.role, item.url))
   const visibleSettingsItems = settingsItems.filter((item) => isPathAllowed(user.role, item.url))
@@ -112,6 +116,16 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
+        {visibleSalesItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Sales</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleSalesItems.map((item) => renderItem(item, location, guardRef, navigate))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         {visibleOperationItems.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>Operation</SidebarGroupLabel>
