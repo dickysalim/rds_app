@@ -22,12 +22,21 @@ import { formatQty } from '@/lib/currency'
 import type { RawMaterialMovementType } from '@/lib/rawMaterial'
 import { useCreateRawMaterialMovementMutation, useRawMaterialsQuery } from '@/lib/queries'
 
-// purchase_in is created only through PurchaseOrderDialog (it needs a PO
-// header) -- this dialog only ever deducts.
-const DEDUCT_OPTIONS: { value: Exclude<RawMaterialMovementType, 'purchase_in'>; label: string }[] = [
+// purchase_in/initial_stock are created elsewhere (PurchaseOrderPanel, raw
+// material creation) -- this dialog covers manual stock-out and the
+// adjustment_up/down correction types in both directions.
+const ADD_OPTIONS: { value: Extract<RawMaterialMovementType, 'adjustment_up'>; label: string }[] = [
+  { value: 'adjustment_up', label: 'Adjustment Up' },
+]
+
+const DEDUCT_OPTIONS: {
+  value: Exclude<RawMaterialMovementType, 'purchase_in' | 'initial_stock' | 'adjustment_up'>
+  label: string
+}[] = [
   { value: 'out_for_production', label: 'Out for Production' },
   { value: 'retur', label: 'Retur' },
   { value: 'stock_loss', label: 'Stock Loss' },
+  { value: 'adjustment_down', label: 'Adjustment Down' },
 ]
 
 function today() {
@@ -44,9 +53,11 @@ export function RawMaterialMovementDialog({
   const { data: rawMaterials = [] } = useRawMaterialsQuery()
   const [rawMatId, setRawMatId] = useState<number | null>(null)
   const [date, setDate] = useState(today())
-  const [movementType, setMovementType] = useState<typeof DEDUCT_OPTIONS[number]['value']>(
-    DEDUCT_OPTIONS[0].value,
-  )
+  const [direction, setDirection] = useState<'add' | 'deduct'>('deduct')
+  const [movementType, setMovementType] = useState<
+    typeof ADD_OPTIONS[number]['value'] | typeof DEDUCT_OPTIONS[number]['value']
+  >(DEDUCT_OPTIONS[0].value)
+  const options = direction === 'add' ? ADD_OPTIONS : DEDUCT_OPTIONS
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -55,18 +66,24 @@ export function RawMaterialMovementDialog({
   const selectedRawMaterial = rawMaterials.find((m) => m.raw_mat_id === rawMatId) ?? null
   const currentStock = selectedRawMaterial?.current_stock ?? 0
   const qtyNum = Number(qty) || 0
-  const exceedsStock = !!rawMatId && qtyNum > currentStock
+  const exceedsStock = direction === 'deduct' && !!rawMatId && qtyNum > currentStock
 
   useEffect(() => {
     if (open) {
       setRawMatId(null)
       setDate(today())
+      setDirection('deduct')
       setMovementType(DEDUCT_OPTIONS[0].value)
       setQty('')
       setNote('')
       setError(null)
     }
   }, [open])
+
+  function handleDirectionChange(next: 'add' | 'deduct') {
+    setDirection(next)
+    setMovementType(next === 'add' ? ADD_OPTIONS[0].value : DEDUCT_OPTIONS[0].value)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -97,8 +114,8 @@ export function RawMaterialMovementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Deduct Raw Material</DialogTitle>
-          <DialogDescription>Record stock going out.</DialogDescription>
+          <DialogTitle>Adjust Raw Material</DialogTitle>
+          <DialogDescription>Record stock going out, or correct a miscounted balance.</DialogDescription>
         </DialogHeader>
         <form id="raw-material-movement-form" className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
@@ -111,13 +128,25 @@ export function RawMaterialMovementDialog({
             )}
           </div>
           <div className="space-y-2">
+            <Label htmlFor="direction">Direction</Label>
+            <Select value={direction} onValueChange={(v) => handleDirectionChange(v as 'add' | 'deduct')}>
+              <SelectTrigger id="direction" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deduct">Deduct</SelectItem>
+                <SelectItem value="add">Add</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="movement_type">Movement Type</Label>
             <Select value={movementType} onValueChange={(v) => setMovementType(v as typeof movementType)}>
               <SelectTrigger id="movement_type" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DEDUCT_OPTIONS.map((option) => (
+                {options.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

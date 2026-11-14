@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatRupiahInput } from '@/lib/currency'
 import type { RawMaterial } from '@/lib/rawMaterial'
 import { useCreateRawMaterialMutation, useUpdateRawMaterialMutation } from '@/lib/queries'
 
@@ -46,6 +47,7 @@ export function RawMaterialDialog({
   const [skuName, setSkuName] = useState('')
   const [unit, setUnit] = useState('')
   const [currentStock, setCurrentStock] = useState('')
+  const [currentPrice, setCurrentPrice] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const createMutation = useCreateRawMaterialMutation()
@@ -57,6 +59,7 @@ export function RawMaterialDialog({
       setSkuName(rawMaterial?.raw_mat_sku_name ?? '')
       setUnit(rawMaterial?.unit ?? '')
       setCurrentStock('')
+      setCurrentPrice('')
       setError(null)
     }
   }, [open, rawMaterial])
@@ -64,7 +67,8 @@ export function RawMaterialDialog({
   const dirty =
     skuName !== (rawMaterial?.raw_mat_sku_name ?? '') ||
     unit !== (rawMaterial?.unit ?? '') ||
-    currentStock !== ''
+    currentStock !== '' ||
+    currentPrice !== ''
 
   function handleOpenChange(next: boolean) {
     if (!next && dirty && !loading) {
@@ -87,6 +91,7 @@ export function RawMaterialDialog({
             raw_mat_sku_name: skuName.trim(),
             unit,
             initial_stock: currentStock ? Number(currentStock.replace(/\D/g, '')) : null,
+            current_price: currentPrice ? Number(currentPrice.replace(/\D/g, '')) : null,
           })
       onSaved(saved)
       onOpenChange(false)
@@ -139,6 +144,24 @@ export function RawMaterialDialog({
                 value={currentStock}
                 onChange={(e) => setCurrentStock(e.target.value.replace(/\D/g, ''))}
               />
+            </div>
+          )}
+          {!rawMaterial && (
+            <div className="space-y-2">
+              <Label htmlFor="current_price">Current Price / Unit</Label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  Rp
+                </span>
+                <Input
+                  id="current_price"
+                  inputMode="numeric"
+                  className="pl-9"
+                  value={currentPrice}
+                  onChange={(e) => setCurrentPrice(formatRupiahInput(e.target.value))}
+                  maxLength={13}
+                />
+              </div>
             </div>
           )}
           {error && <p className="text-destructive text-sm">{error}</p>}

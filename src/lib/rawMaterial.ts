@@ -23,6 +23,7 @@ export interface RawMaterialInput {
 
 export interface CreateRawMaterialInput extends RawMaterialInput {
   initial_stock: number | null
+  current_price: number | null
 }
 
 export async function createRawMaterial(input: CreateRawMaterialInput): Promise<RawMaterial> {
@@ -67,7 +68,14 @@ export async function getRawMaterialHistory(rawMatId: number): Promise<RawMateri
   return data.history
 }
 
-export type RawMaterialMovementType = 'purchase_in' | 'out_for_production' | 'retur' | 'stock_loss'
+export type RawMaterialMovementType =
+  | 'purchase_in'
+  | 'out_for_production'
+  | 'retur'
+  | 'stock_loss'
+  | 'initial_stock'
+  | 'adjustment_up'
+  | 'adjustment_down'
 
 export interface RawMaterialLedgerEntry {
   id: number

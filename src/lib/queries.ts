@@ -301,7 +301,12 @@ export function useCreateRawMaterialMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateRawMaterialInput) => createRawMaterial(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterials })
+      // Creation also writes an initial_stock ledger row (with optional
+      // price) -- refetch so Unit Price / Raw Mat. Value rehydrate too.
+      queryClient.invalidateQueries({ queryKey: queryKeys.rawMaterialLedger })
+    },
   })
 }
 

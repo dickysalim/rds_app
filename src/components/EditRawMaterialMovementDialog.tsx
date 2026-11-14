@@ -29,13 +29,19 @@ import type { RawMaterialLedgerEntry, RawMaterialMovementType } from '@/lib/rawM
 // so an edit can never silently flip the direction of a past movement.
 const PLUS_OPTIONS: { value: RawMaterialMovementType; label: string }[] = [
   { value: 'purchase_in', label: 'Purchase In' },
+  { value: 'initial_stock', label: 'Initial Stock' },
+  { value: 'adjustment_up', label: 'Adjustment Up' },
 ]
 
 const MINUS_OPTIONS: { value: RawMaterialMovementType; label: string }[] = [
   { value: 'out_for_production', label: 'Out for Production' },
   { value: 'retur', label: 'Retur' },
   { value: 'stock_loss', label: 'Stock Loss' },
+  { value: 'adjustment_down', label: 'Adjustment Down' },
 ]
+
+// Only these two ever carry a price/PO reference.
+const PRICED_TYPES: RawMaterialMovementType[] = ['purchase_in', 'initial_stock']
 
 export function EditRawMaterialMovementDialog({
   open,
@@ -82,7 +88,7 @@ export function EditRawMaterialMovementDialog({
           movement_type: movementType,
           qty: Number(qty),
           note: note.trim() || null,
-          price: movementType === 'purchase_in' && price ? Number(price.replace(/\D/g, '')) : null,
+          price: PRICED_TYPES.includes(movementType) && price ? Number(price.replace(/\D/g, '')) : null,
           purchase_order_freetext: movementType === 'purchase_in' ? poNumber.trim() || null : null,
         },
       })
@@ -134,7 +140,7 @@ export function EditRawMaterialMovementDialog({
               <Input id="edit_date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
           </div>
-          {movementType === 'purchase_in' && (
+          {PRICED_TYPES.includes(movementType) && (
             <div className="grid grid-cols-2 gap-4">
               {!hideCost && (
                 <div className="space-y-2">
@@ -154,16 +160,18 @@ export function EditRawMaterialMovementDialog({
                   </div>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="edit_po_number">Purchase Order</Label>
-                <Input
-                  id="edit_po_number"
-                  value={poNumber}
-                  onChange={(e) => setPoNumber(e.target.value)}
-                  placeholder="PO number"
-                  maxLength={100}
-                />
-              </div>
+              {movementType === 'purchase_in' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit_po_number">Purchase Order</Label>
+                  <Input
+                    id="edit_po_number"
+                    value={poNumber}
+                    onChange={(e) => setPoNumber(e.target.value)}
+                    placeholder="PO number"
+                    maxLength={100}
+                  />
+                </div>
+              )}
             </div>
           )}
           <div className="space-y-2">

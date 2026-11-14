@@ -96,14 +96,22 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
     e.preventDefault()
     setError(null)
 
+    if (!poNumber.trim()) {
+      setError('Purchase Order number is required')
+      return
+    }
     if (items.length === 0 || items.some((row) => !row.rawMatQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a raw material, unit and qty')
+      return
+    }
+    if (items.some((row) => row.rawMatId == null)) {
+      setError('Pick an existing raw material from the list for every item')
       return
     }
 
     const input: PurchaseOrderInput = {
       po_date: poDate,
-      po_number: poNumber.trim() || null,
+      po_number: poNumber.trim(),
       items: items.map((row) => ({
         raw_mat_id: row.rawMatId,
         raw_mat_sku_name: row.rawMatQuery.trim(),
@@ -153,6 +161,7 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
               onChange={(e) => setPoNumber(e.target.value)}
               placeholder="PO number"
               maxLength={100}
+              required
             />
           </div>
         </div>

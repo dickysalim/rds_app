@@ -11,7 +11,7 @@ export interface PurchaseOrderItemInput {
 
 export interface PurchaseOrderInput {
   po_date: string
-  po_number?: string | null
+  po_number: string
   items: PurchaseOrderItemInput[]
 }
 

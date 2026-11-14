@@ -1,5 +1,7 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import type { AppOutletContext } from '@/components/AppLayout'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,16 +32,20 @@ import { Pagination } from '@/components/Pagination'
 import { RawMaterialDialog } from '@/components/RawMaterialDialog'
 import { RawMaterialHistoryDialog } from '@/components/RawMaterialHistoryDialog'
 import { SortableTableHead } from '@/components/SortableTableHead'
-import { formatQty } from '@/lib/currency'
+import { hideFinancials } from '@/lib/access'
+import { formatQty, formatRupiah } from '@/lib/currency'
 import type { RawMaterial } from '@/lib/rawMaterial'
-import { useDeleteRawMaterialMutation, useRawMaterialsQuery } from '@/lib/queries'
+import { useDeleteRawMaterialMutation, useRawMaterialLedgerQuery, useRawMaterialsQuery } from '@/lib/queries'
 import { usePagination } from '@/lib/usePagination'
 import { useSort } from '@/lib/useSort'
 
 type RawMaterialSortKey = 'raw_mat_id' | 'raw_mat_sku_name' | 'current_stock'
 
 export function RawMaterialPage() {
+  const { user } = useOutletContext<AppOutletContext>()
+  const hideCost = hideFinancials(user.role)
   const { data: rawMaterials = [], isLoading: loading } = useRawMaterialsQuery()
+  const { data: ledgerEntries = [] } = useRawMaterialLedgerQuery()
   const deleteMutation = useDeleteRawMaterialMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRawMaterial, setEditingRawMaterial] = useState<RawMaterial | null>(null)
@@ -59,6 +65,33 @@ export function RawMaterialPage() {
     if (!deletingRawMaterial) return
     await deleteMutation.mutateAsync(deletingRawMaterial.raw_mat_id)
     setDeletingRawMaterial(null)
+  }
+
+  // Raw Mat. Value = current_stock * price. Not every stock increase has a
+  // price (initial counts, unpriced purchase_in rows), so unpriced qty
+  // borrows the weighted-average price of the priced increases for that raw
+  // material -- flagged "(Est.)" when that happened.
+  const valueByRawMat = new Map<number, { avgPrice: number; isEstimated: boolean }>()
+  {
+    const pricedQtyMap = new Map<number, number>()
+    const pricedCostMap = new Map<number, number>()
+    const unpricedIncreaseQtyMap = new Map<number, number>()
+    for (const entry of ledgerEntries) {
+      if (entry.qty <= 0) continue
+      if (entry.price != null) {
+        pricedQtyMap.set(entry.raw_mat_id, (pricedQtyMap.get(entry.raw_mat_id) ?? 0) + entry.qty)
+        pricedCostMap.set(entry.raw_mat_id, (pricedCostMap.get(entry.raw_mat_id) ?? 0) + entry.qty * entry.price)
+      } else {
+        unpricedIncreaseQtyMap.set(entry.raw_mat_id, (unpricedIncreaseQtyMap.get(entry.raw_mat_id) ?? 0) + entry.qty)
+      }
+    }
+    for (const rawMaterial of rawMaterials) {
+      const pricedQty = pricedQtyMap.get(rawMaterial.raw_mat_id) ?? 0
+      const pricedCost = pricedCostMap.get(rawMaterial.raw_mat_id) ?? 0
+      const unpricedIncreaseQty = unpricedIncreaseQtyMap.get(rawMaterial.raw_mat_id) ?? 0
+      const avgPrice = pricedQty > 0 ? Math.round(pricedCost / pricedQty) : 0
+      valueByRawMat.set(rawMaterial.raw_mat_id, { avgPrice, isEstimated: unpricedIncreaseQty > 0 })
+    }
   }
 
   const filteredRawMaterials = applySort(
@@ -116,29 +149,46 @@ export function RawMaterialPage() {
                 Stock
               </SortableTableHead>
               <TableHead>Unit</TableHead>
+              {!hideCost && <TableHead>Unit Price</TableHead>}
+              {!hideCost && <TableHead>Raw Mat. Value</TableHead>}
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={hideCost ? 5 : 7} className="text-center text-muted-foreground">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredRawMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={hideCost ? 5 : 7} className="text-center text-muted-foreground">
                   {search ? 'No matching raw materials.' : 'No raw materials yet.'}
                 </TableCell>
               </TableRow>
             ) : (
-              pagedRawMaterials.map((rawMaterial) => (
+              pagedRawMaterials.map((rawMaterial) => {
+                const val = valueByRawMat.get(rawMaterial.raw_mat_id)
+                const value = Math.round(rawMaterial.current_stock * (val?.avgPrice ?? 0))
+                return (
                 <TableRow key={rawMaterial.raw_mat_id}>
                   <TableCell>{String(rawMaterial.raw_mat_id).padStart(3, '0')}</TableCell>
                   <TableCell>{rawMaterial.raw_mat_sku_name}</TableCell>
                   <TableCell>{formatQty(rawMaterial.current_stock)}</TableCell>
                   <TableCell>{rawMaterial.unit}</TableCell>
+                  {!hideCost && (
+                    <TableCell className={`font-medium ${val?.isEstimated ? 'text-amber-700' : 'text-[#3EA768]'}`}>
+                      {formatRupiah(val?.avgPrice ?? 0)}
+                      {val?.isEstimated ? ' (Est.)' : ''}
+                    </TableCell>
+                  )}
+                  {!hideCost && (
+                    <TableCell className={`font-medium ${val?.isEstimated ? 'text-amber-700' : 'text-[#3EA768]'}`}>
+                      {formatRupiah(value)}
+                      {val?.isEstimated ? ' (Est.)' : ''}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -168,7 +218,8 @@ export function RawMaterialPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
+                )
+              })
             )}
           </TableBody>
         </Table>
