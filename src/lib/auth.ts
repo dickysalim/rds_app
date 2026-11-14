@@ -74,6 +74,10 @@ const ROLE_LABEL: Record<string, string> = {
   staff: 'Staff',
   quality_control: 'Quality Control',
   staging_admin: 'Admin',
+  // Test-only roles, forced onto the staging DB server-side -- labeled like
+  // their real counterpart since they look/behave the same otherwise.
+  test_owner: 'Owner',
+  test_admin: 'Admin',
 }
 
 export function roleLabel(role: string): string {

@@ -93,7 +93,9 @@ export function AppSidebar({
   return (
     <Sidebar>
       <SidebarHeader>
-        {(user.role === 'super_admin' || user.role === 'staging_admin') && isUsingStagingDb() && (
+        {(((user.role === 'super_admin' || user.role === 'staging_admin') && isUsingStagingDb()) ||
+          user.role === 'test_owner' ||
+          user.role === 'test_admin') && (
           <div className="mx-2 mt-2 rounded-md bg-amber-500 px-2 py-1 text-center text-xs font-semibold text-white">
             STAGING DATABASE
           </div>
