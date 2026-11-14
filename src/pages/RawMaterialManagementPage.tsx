@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { AppOutletContext } from '@/components/AppLayout'
+import { AdjustRawMaterialDialog } from '@/components/AdjustRawMaterialDialog'
 import { EditRawMaterialMovementDialog } from '@/components/EditRawMaterialMovementDialog'
 import { EditRawMaterialPriceDialog } from '@/components/EditRawMaterialPriceDialog'
 import { PurchaseOrderPanel } from '@/components/PurchaseOrderPanel'
@@ -140,6 +141,7 @@ export function RawMaterialManagementPage() {
   const [movementTypeFilter, setMovementTypeFilter] = useState<Set<string>>(new Set())
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [deductDialogOpen, setDeductDialogOpen] = useState(false)
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
   const [directionFilter, setDirectionFilter] = useState<'increase' | 'decrease' | null>(null)
@@ -398,11 +400,12 @@ export function RawMaterialManagementPage() {
             </div>
             <div className="flex gap-2">
               <Button className="bg-[#3EA768] text-white hover:bg-[#357f52]" onClick={() => setView('add')}>
-                + Add Raw Material
+                + Add Raw Mat.
               </Button>
               <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => setDeductDialogOpen(true)}>
-                Adjust Raw Material
+                - Deduct Raw Mat.
               </Button>
+              <Button onClick={() => setAdjustDialogOpen(true)}>Adjust Raw Mat.</Button>
             </div>
           </div>
 
@@ -596,11 +599,12 @@ export function RawMaterialManagementPage() {
             </div>
             <div className="flex gap-2">
               <Button className="bg-[#3EA768] text-white hover:bg-[#357f52]" onClick={() => setView('add')}>
-                + Add Raw Material
+                + Add Raw Mat.
               </Button>
               <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => setDeductDialogOpen(true)}>
-                Adjust Raw Material
+                - Deduct Raw Mat.
               </Button>
+              <Button onClick={() => setAdjustDialogOpen(true)}>Adjust Raw Mat.</Button>
             </div>
           </div>
 
@@ -817,6 +821,7 @@ export function RawMaterialManagementPage() {
       </Tabs>
 
       <RawMaterialMovementDialog open={deductDialogOpen} onOpenChange={setDeductDialogOpen} />
+      <AdjustRawMaterialDialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen} />
       <EditRawMaterialMovementDialog
         open={!!editingEntry}
         onOpenChange={(open) => !open && setEditingEntry(null)}

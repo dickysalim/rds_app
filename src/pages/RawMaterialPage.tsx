@@ -81,7 +81,11 @@ export function RawMaterialPage() {
       if (entry.price != null) {
         pricedQtyMap.set(entry.raw_mat_id, (pricedQtyMap.get(entry.raw_mat_id) ?? 0) + entry.qty)
         pricedCostMap.set(entry.raw_mat_id, (pricedCostMap.get(entry.raw_mat_id) ?? 0) + entry.qty * entry.price)
-      } else {
+      } else if (entry.movement_type === 'purchase_in' || entry.movement_type === 'initial_stock') {
+        // Only these two are ever supposed to carry a price -- missing one
+        // means a real purchase/count went unpriced, so flag it.
+        // adjustment_up never has a price by design (it's a recount, not a
+        // purchase), so it borrows the average silently without flagging.
         unpricedIncreaseQtyMap.set(entry.raw_mat_id, (unpricedIncreaseQtyMap.get(entry.raw_mat_id) ?? 0) + entry.qty)
       }
     }
