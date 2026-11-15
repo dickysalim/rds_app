@@ -169,11 +169,17 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
         <div className="space-y-2">
           <Label className="font-bold">Raw Material Item</Label>
           <div className="rounded-xl border border-[oklch(0.75_0_0)] bg-panel shadow-sm">
-            <div className="hidden gap-2 rounded-t-xl border-b border-[oklch(0.75_0_0)] bg-panel px-3 pb-3 pt-2 text-xs font-semibold text-black sm:grid sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_9rem_1fr_2.25rem]">
+            <div
+              className={`hidden gap-2 rounded-t-xl border-b border-[oklch(0.75_0_0)] bg-panel px-3 pb-3 pt-2 text-xs font-semibold text-black sm:grid ${
+                hideCost
+                  ? 'sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_1fr_2.25rem]'
+                  : 'sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_9rem_1fr_2.25rem]'
+              }`}
+            >
               <span>Raw Material</span>
               <span>Unit</span>
               <span>Qty</span>
-              {!hideCost ? <span>Price</span> : <span />}
+              {!hideCost && <span>Price</span>}
               <span>Note</span>
               <span />
             </div>
@@ -194,7 +200,11 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
                 return (
                   <div
                     key={row.key}
-                    className="grid grid-cols-1 gap-2 bg-panel p-2 sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_9rem_1fr_2.25rem] sm:items-start sm:px-3 sm:py-1.5"
+                    className={`grid grid-cols-1 gap-2 bg-panel p-2 sm:items-start sm:px-3 sm:py-1.5 ${
+                      hideCost
+                        ? 'sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_1fr_2.25rem]'
+                        : 'sm:grid-cols-[minmax(0,1.1fr)_6rem_5.5rem_9rem_1fr_2.25rem]'
+                    }`}
                   >
                     <div className="relative min-w-0">
                       <Input
@@ -301,7 +311,7 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
                         </p>
                       )}
                     </div>
-                    {!hideCost ? (
+                    {!hideCost && (
                       <div className="relative min-w-0">
                         <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                           Rp
@@ -315,8 +325,6 @@ export function PurchaseOrderPanel({ onCancel, onSaved }: { onCancel: () => void
                           }
                         />
                       </div>
-                    ) : (
-                      <div />
                     )}
                     <Input
                       className={cellInputClass}
