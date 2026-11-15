@@ -235,6 +235,7 @@ export function RawMaterialPage() {
         onOpenChange={setDialogOpen}
         rawMaterial={editingRawMaterial}
         onSaved={handleSaved}
+        hideCost={hideCost}
       />
 
       <RawMaterialHistoryDialog

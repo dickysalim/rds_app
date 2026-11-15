@@ -38,11 +38,13 @@ export function RawMaterialDialog({
   onOpenChange,
   rawMaterial,
   onSaved,
+  hideCost = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   rawMaterial: RawMaterial | null
   onSaved: (rawMaterial: RawMaterial) => void
+  hideCost?: boolean
 }) {
   const [skuName, setSkuName] = useState('')
   const [unit, setUnit] = useState('')
@@ -146,7 +148,7 @@ export function RawMaterialDialog({
               />
             </div>
           )}
-          {!rawMaterial && (
+          {!rawMaterial && !hideCost && (
             <div className="space-y-2">
               <Label htmlFor="current_price">Current Price / Unit</Label>
               <div className="relative">
