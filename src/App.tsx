@@ -13,6 +13,8 @@ import { TeamSettingsPage } from '@/pages/TeamSettingsPage'
 import { ForcePasswordChangePage } from '@/pages/ForcePasswordChangePage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { StockManagementPage } from '@/pages/StockManagementPage'
+import { RawMaterialPage } from '@/pages/RawMaterialPage'
+import { RawMaterialManagementPage } from '@/pages/RawMaterialManagementPage'
 import { PdfPreviewPage } from '@/pages/dev/PdfPreviewPage'
 import { fetchCurrentUser, logout, type AuthUser } from '@/lib/auth'
 import { getToken } from '@/lib/api'
@@ -82,6 +84,8 @@ function App() {
           <Route path="/stock-management" element={<StockManagementPage />} />
           <Route path="/customer" element={<CustomerPage />} />
           <Route path="/product" element={<ProductPage />} />
+          <Route path="/raw-material" element={<RawMaterialPage />} />
+          <Route path="/raw-mat-management" element={<RawMaterialManagementPage />} />
           <Route path="/revenue" element={<ComingSoonPage title="Revenue" />} />
           <Route path="/expense" element={<ComingSoonPage title="Expense" />} />
           <Route path="/request-expense" element={<ComingSoonPage title="Request Expense" />} />

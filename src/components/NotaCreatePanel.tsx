@@ -208,6 +208,10 @@ export function NotaCreatePanel({
       setError('Every item needs a SKU name, unit and qty')
       return
     }
+    if (items.some((row) => row.skuId == null)) {
+      setError('Pick an existing SKU from the list for every item')
+      return
+    }
     if (items.some(exceedsStock)) {
       setError('An item quantity exceeds current stock')
       return
@@ -234,6 +238,10 @@ export function NotaCreatePanel({
     }
     if (items.length === 0 || items.some((row) => !row.skuQuery.trim() || !row.unit || !row.qty)) {
       setError('Every item needs a SKU name, unit and qty')
+      return
+    }
+    if (items.some((row) => row.skuId == null)) {
+      setError('Pick an existing SKU from the list for every item')
       return
     }
     if (items.some(exceedsStock)) {
