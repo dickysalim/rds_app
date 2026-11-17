@@ -252,17 +252,25 @@ export function RawMaterialManagementPage() {
   const poGroupMap = new Map<string, { poNumber: string; date: string; movements: typeof entries }>()
   for (const entry of entries) {
     if (entry.movement_type === 'initial_stock') {
-      // No PO freetext on these -- each unpriced initial-stock row stands as
-      // its own one-item "group" so it still shows up here for pricing.
+      // No PO freetext on these, and they're not created together like a
+      // real PO batch -- merge every unpriced one into a single "Initial
+      // Stock" group instead of a one-row-per-entry list, so pricing many
+      // raw materials' starting stock doesn't flood this table.
       if (entry.price != null) continue
-      poGroupMap.set(`initial_stock__${entry.id}`, {
-        poNumber: 'Initial Stock',
-        date: entry.date,
-        movements: [entry],
-      })
+      let group = poGroupMap.get('initial_stock')
+      if (!group) {
+        group = { poNumber: 'Initial Stock', date: entry.date, movements: [] }
+        poGroupMap.set('initial_stock', group)
+      }
+      if (entry.date > group.date) group.date = entry.date
+      group.movements.push(entry)
       continue
     }
     if (entry.movement_type !== 'purchase_in' || !entry.purchase_order_freetext) continue
+    // Once an item's price is filled in, drop it from the group entirely --
+    // this list is for resolving what's still missing, not a running record
+    // of the whole PO (that's what Daily Movement is for).
+    if (entry.price != null) continue
     const key = `${entry.purchase_order_freetext}__${entry.date}`
     let group = poGroupMap.get(key)
     if (!group) {
@@ -272,7 +280,7 @@ export function RawMaterialManagementPage() {
     group.movements.push(entry)
   }
   const poGroupsMissingPrice = Array.from(poGroupMap.entries())
-    .filter(([, group]) => group.movements.some((m) => m.price == null))
+    .filter(([, group]) => group.movements.length > 0)
     .sort((a, b) => b[1].date.localeCompare(a[1].date))
 
   function FilterDialogButton() {
