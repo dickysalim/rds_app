@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, PrinterIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { AppOutletContext } from '@/components/AppLayout'
@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PdfPreviewFrame } from '@/components/PdfPreviewFrame'
 import { Pagination } from '@/components/Pagination'
 import { RawMaterialDialog } from '@/components/RawMaterialDialog'
 import { RawMaterialHistoryDialog } from '@/components/RawMaterialHistoryDialog'
@@ -35,7 +37,8 @@ import { SortableTableHead } from '@/components/SortableTableHead'
 import { hideFinancials } from '@/lib/access'
 import { formatQty, formatRupiah } from '@/lib/currency'
 import type { RawMaterial } from '@/lib/rawMaterial'
-import { useDeleteRawMaterialMutation, useRawMaterialLedgerQuery, useRawMaterialsQuery } from '@/lib/queries'
+import { useBusinessQuery, useDeleteRawMaterialMutation, useRawMaterialLedgerQuery, useRawMaterialsQuery } from '@/lib/queries'
+import { previewRawMaterialStockOpnamePdfUrl } from '@/lib/rawMaterialStockOpnamePdf'
 import { usePagination } from '@/lib/usePagination'
 import { useSort } from '@/lib/useSort'
 
@@ -46,12 +49,16 @@ export function RawMaterialPage() {
   const hideCost = hideFinancials(user.role)
   const { data: rawMaterials = [], isLoading: loading } = useRawMaterialsQuery()
   const { data: ledgerEntries = [] } = useRawMaterialLedgerQuery()
+  const { data: business } = useBusinessQuery()
   const deleteMutation = useDeleteRawMaterialMutation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRawMaterial, setEditingRawMaterial] = useState<RawMaterial | null>(null)
   const [deletingRawMaterial, setDeletingRawMaterial] = useState<RawMaterial | null>(null)
   const [historyRawMaterial, setHistoryRawMaterial] = useState<RawMaterial | null>(null)
   const [search, setSearch] = useState('')
+  const [opnamePdfUrl, setOpnamePdfUrl] = useState<string | null>(null)
+  const [opnamePdfLoading, setOpnamePdfLoading] = useState(false)
+  const [opnamePdfError, setOpnamePdfError] = useState<string | null>(null)
   const { sortKey, sortDir, toggle, applySort } = useSort<RawMaterial, RawMaterialSortKey>(
     'raw_mat_id',
     'desc',
@@ -65,6 +72,26 @@ export function RawMaterialPage() {
     if (!deletingRawMaterial) return
     await deleteMutation.mutateAsync(deletingRawMaterial.raw_mat_id)
     setDeletingRawMaterial(null)
+  }
+
+  function closeOpnamePdf() {
+    if (opnamePdfUrl) URL.revokeObjectURL(opnamePdfUrl)
+    setOpnamePdfUrl(null)
+    setOpnamePdfError(null)
+  }
+
+  async function handlePrintStockOpname() {
+    setOpnamePdfLoading(true)
+    setOpnamePdfError(null)
+    try {
+      if (!business) throw new Error('Set up Business Settings first')
+      const url = await previewRawMaterialStockOpnamePdfUrl(rawMaterials, business)
+      setOpnamePdfUrl(url)
+    } catch (err) {
+      setOpnamePdfError(err instanceof Error ? err.message : 'Failed to generate PDF')
+    } finally {
+      setOpnamePdfLoading(false)
+    }
   }
 
   // Raw Mat. Value = current_stock * price. Not every stock increase has a
@@ -116,14 +143,20 @@ export function RawMaterialPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-80"
         />
-        <Button
-          onClick={() => {
-            setEditingRawMaterial(null)
-            setDialogOpen(true)
-          }}
-        >
-          + Add New Raw Material
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handlePrintStockOpname} disabled={opnamePdfLoading}>
+            <PrinterIcon />
+            {opnamePdfLoading ? 'Generating…' : 'Print Stock Opname'}
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingRawMaterial(null)
+              setDialogOpen(true)
+            }}
+          >
+            + Add New Raw Material
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
@@ -265,6 +298,28 @@ export function RawMaterialPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={opnamePdfLoading || opnamePdfUrl !== null || opnamePdfError !== null}
+        onOpenChange={(open) => !open && closeOpnamePdf()}
+      >
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Stock Opname</DialogTitle>
+          </DialogHeader>
+          {opnamePdfLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Generating…</p>
+          ) : opnamePdfError ? (
+            <p className="py-8 text-center text-sm text-destructive">{opnamePdfError}</p>
+          ) : opnamePdfUrl ? (
+            <PdfPreviewFrame
+              title="Stock Opname"
+              url={opnamePdfUrl}
+              frameClassName="w-full rounded-md border"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
