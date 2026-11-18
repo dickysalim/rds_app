@@ -1,4 +1,4 @@
-import { API_URL, apiFetch } from '@/lib/api'
+import { API_URL, apiFetch, getToken } from '@/lib/api'
 
 export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'QRIS', 'Giro', 'Other'] as const
 
@@ -276,7 +276,11 @@ export async function voidPayment(paymentId: number): Promise<void> {
 }
 
 export function getPaymentEvidenceUrl(paymentId: number): string {
-  return `${API_URL}/payments/${paymentId}/evidence?t=${Date.now()}`
+  // Opened as a plain <a href>, not apiFetch, so it can't carry an
+  // Authorization header -- the backend also accepts the token here as a
+  // query param.
+  const token = getToken() ?? ''
+  return `${API_URL}/payments/${paymentId}/evidence?t=${Date.now()}&token=${encodeURIComponent(token)}`
 }
 
 export async function uploadPaymentEvidence(paymentId: number, blob: Blob): Promise<void> {
