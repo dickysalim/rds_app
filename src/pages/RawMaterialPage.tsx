@@ -166,7 +166,7 @@ export function RawMaterialPage() {
 
       {!hideCost && (
         <div className="w-64 rounded-md border bg-panel p-3 shadow-sm border-[oklch(0.84_0_0)]">
-          <p className="text-xs text-[#3EA768]">Cost Value</p>
+          <p className="text-xs text-muted-foreground">Cost Value</p>
           <p className="text-lg font-semibold">{formatRupiah(totalRawMatValue)}</p>
         </div>
       )}
