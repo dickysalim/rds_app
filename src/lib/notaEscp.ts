@@ -407,6 +407,11 @@ export function printNotaEscpViaBrowser(
     })
     .join('')
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    /* Chrome/Edge draw the page-wide date/title/URL header+footer inside the
+       @page margin area -- zeroing it removes that space so there's nowhere
+       for them to render, regardless of the user's own "Headers and
+       footers" print-dialog setting. */
+    @page{margin:0;}
     body{margin:0;padding:12px;}
     pre{font-family:monospace;font-size:14px;line-height:20px;white-space:pre;margin:0;}
   </style></head><body><pre>${rows}</pre></body></html>`
