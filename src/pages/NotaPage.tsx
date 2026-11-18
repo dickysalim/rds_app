@@ -109,6 +109,9 @@ export function NotaPage() {
   const total = notaPage?.total ?? 0
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const totalBillSum = nota.reduce((sum, n) => sum + totalBillOf(n), 0)
+  const costSum = nota.reduce((sum, n) => sum + n.total_cost, 0)
+  const profitSum = nota.reduce((sum, n) => sum + (n.total_price - n.total_cost), 0)
 
   function handleSaved(created: { nota_id: number }) {
     setView('list')
@@ -276,6 +279,25 @@ export function NotaPage() {
           )}
         </div>
         <Button onClick={() => setView('create')}>+ Add Nota</Button>
+      </div>
+
+      <div className={`grid gap-3 ${hideCost ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        <div className="rounded-md border bg-panel p-3 shadow-sm border-[oklch(0.84_0_0)]">
+          <p className="text-xs text-muted-foreground">Total Bill</p>
+          <p className="text-lg font-semibold">{formatRupiah(totalBillSum)}</p>
+        </div>
+        {!hideCost && (
+          <div className="rounded-md border bg-panel p-3 shadow-sm border-[oklch(0.84_0_0)]">
+            <p className="text-xs text-muted-foreground">Cost</p>
+            <p className="text-lg font-semibold">{formatRupiah(costSum)}</p>
+          </div>
+        )}
+        {!hideCost && (
+          <div className="rounded-md border bg-panel p-3 shadow-sm border-[oklch(0.84_0_0)]">
+            <p className="text-xs text-muted-foreground">Profit</p>
+            <p className="text-lg font-semibold">{formatRupiah(profitSum)}</p>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
