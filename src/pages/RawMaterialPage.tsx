@@ -132,6 +132,11 @@ export function RawMaterialPage() {
 
   const { page, setPage, pageCount, paged: pagedRawMaterials } = usePagination(filteredRawMaterials)
 
+  const totalRawMatValue = filteredRawMaterials.reduce((sum, m) => {
+    const val = valueByRawMat.get(m.raw_mat_id)
+    return sum + Math.round(m.current_stock * (val?.avgPrice ?? 0))
+  }, 0)
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Raw Material</h1>
@@ -158,6 +163,13 @@ export function RawMaterialPage() {
           </Button>
         </div>
       </div>
+
+      {!hideCost && (
+        <div className="w-64 rounded-md border bg-panel p-3 shadow-sm border-[oklch(0.84_0_0)]">
+          <p className="text-xs text-muted-foreground">Total Raw Mat. Value</p>
+          <p className="text-lg font-semibold text-[#3EA768]">{formatRupiah(totalRawMatValue)}</p>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border bg-panel shadow-sm border-[oklch(0.84_0_0)] [&_tr]:border-[oklch(0.86_0_0)]">
         <Table>
