@@ -149,6 +149,7 @@ export type EscpVariantOptions = {
   underline: boolean // honor underline (ESC - 1 / ESC - 0)
   wide: boolean // honor double-width title (ESC W 1 / ESC W 0)
   doubleStrike: boolean // ESC G: print each line twice for darker text
+  compactItems: boolean // drop the blank row between the table header rule and item 1
 }
 
 export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
@@ -162,6 +163,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     underline: true,
     wide: true,
     doubleStrike: false,
+    compactItems: false,
   },
   type1: {
     label: 'Type 1',
@@ -171,6 +173,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     underline: true,
     wide: true,
     doubleStrike: false,
+    compactItems: true,
   },
   type2: {
     label: 'Type 2',
@@ -180,6 +183,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     underline: true,
     wide: true,
     doubleStrike: false,
+    compactItems: false,
   },
   type3: {
     label: 'Type 3',
@@ -189,6 +193,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     underline: false,
     wide: false,
     doubleStrike: false,
+    compactItems: false,
   },
   type4: {
     label: 'Type 4',
@@ -198,6 +203,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     underline: true,
     wide: true,
     doubleStrike: true,
+    compactItems: false,
   },
 }
 
@@ -207,7 +213,9 @@ export function buildNotaEscpLines(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'control',
 ): EscpLine[] {
+  const compactItems = ESCP_VARIANTS[variant].compactItems
   const isSuratJalan = docType === 'surat_jalan'
   const lines: EscpLine[] = []
   const rule = '_'.repeat(COLS)
@@ -276,7 +284,7 @@ export function buildNotaEscpLines(
       { bold: true },
     )
     push(rule)
-    push('')
+    if (!compactItems) push('')
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME_SJ)
       nameLines.forEach((nl, i) => {
@@ -306,7 +314,7 @@ export function buildNotaEscpLines(
       { bold: true },
     )
     push(rule)
-    push('')
+    if (!compactItems) push('')
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME)
       nameLines.forEach((nl, i) => {
@@ -492,8 +500,9 @@ export function printNotaEscpViaBrowser(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'control',
 ): void {
-  const lines = buildNotaEscpLines(nota, business, docType)
+  const lines = buildNotaEscpLines(nota, business, docType, variant)
   const rows = lines
     .map((l) => {
       const style = [

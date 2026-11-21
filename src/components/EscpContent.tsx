@@ -1,17 +1,19 @@
-import { buildNotaEscpLines, type Business, type NotaDetail, type NotaDocType } from '@/lib/notaEscp'
+import { buildNotaEscpLines, type Business, type NotaDetail, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
 
 export function EscpContent({
   nota,
   business,
   docType = 'nota_pembelian',
+  variant = 'control',
   className = '',
 }: {
   nota: NotaDetail | null
   business: Business | null
   docType?: NotaDocType
+  variant?: EscpVariant
   className?: string
 }) {
-  const lines = nota && business ? buildNotaEscpLines(nota, business, docType) : []
+  const lines = nota && business ? buildNotaEscpLines(nota, business, docType, variant) : []
 
   return (
     <div className={`flex justify-center overflow-auto rounded-md border bg-white p-6 ${className}`}>

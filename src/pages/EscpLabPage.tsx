@@ -29,7 +29,7 @@ export function EscpLabPage() {
     } catch {
       // QZ Tray not installed/running -- fall back to the browser's own print
       // dialog so Print still works on a plain PC.
-      printNotaEscpViaBrowser(nota, effectiveBusiness, docType)
+      printNotaEscpViaBrowser(nota, effectiveBusiness, docType, variant)
     }
   }
 
@@ -83,6 +83,7 @@ export function EscpLabPage() {
                 nota={nota}
                 business={effectiveBusiness}
                 docType={docType}
+                variant={variant}
                 className="min-h-0 flex-1"
               />
             </div>
