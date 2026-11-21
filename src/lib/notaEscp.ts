@@ -401,9 +401,9 @@ export function buildNotaEscpLines(
   const signatureBox = (label: string): string[] => {
     const blank = ' '.repeat(BOX_WIDTH)
     const nameLine = `(${BOX_H.repeat(BOX_WIDTH - 2)})`
-    // Compact: label, three blank rows, name line -- the payment block is
-    // spread below so its first line is level with the label row and its last line (No. Rek) shares the name line's row.
-    if (compactSignature) return [left(label, BOX_WIDTH), blank, blank, blank, nameLine]
+    // Compact: label, one blank row, name line -- the name line lands on the
+    // third footer row, the same row as the payment block's last line (No. Rek).
+    if (compactSignature) return [left(label, BOX_WIDTH), blank, nameLine]
     return [left(label, BOX_WIDTH), blank, blank, blank, blank, nameLine]
   }
   const hormatBox = signatureBox('Hormat Kami,')
@@ -423,18 +423,6 @@ export function buildNotaEscpLines(
     if (business.payment_account_number) {
       paymentLines.push({ text: `No. Rek : ${business.payment_account_number}` })
     }
-  }
-
-  if (compactSignature && paymentLines.length > 0) {
-    // Spread the payment block over the whole signature box: first line on the
-    // "Hormat Kami" row, last line (No. Rek) on the name-line row, the rest evenly between.
-    const span = hormatBox.length
-    const spread: { text: string; bold?: boolean }[] = Array.from({ length: span }, () => ({ text: '' }))
-    paymentLines.forEach((line, i) => {
-      const row = paymentLines.length === 1 ? 0 : Math.round((i * (span - 1)) / (paymentLines.length - 1))
-      spread[row] = line
-    })
-    paymentLines.splice(0, paymentLines.length, ...spread)
   }
 
   push('')
