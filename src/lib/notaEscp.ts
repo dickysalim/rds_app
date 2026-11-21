@@ -157,7 +157,7 @@ export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
 // (init codes + style on/off), not the 80-column text layout, so a user can
 // print Type 1..4 back-to-back and compare on the real printer. Edit the
 // options below to tune a type; add a type by extending this table.
-export type EscpVariant = 'control' | 'type1' | 'type2' | 'type3' | 'type4'
+export type EscpVariant = 'type1'
 
 export type EscpVariantOptions = {
   label: string
@@ -175,22 +175,6 @@ export type EscpVariantOptions = {
 }
 
 export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
-  // Control: byte-for-byte what production prints today. Never tune this one;
-  // it is the baseline every other type is compared against.
-  control: {
-    label: 'Control',
-    description: 'This is what the production use',
-    nlq: true,
-    bold: true,
-    underline: true,
-    wide: true,
-    doubleStrike: false,
-    compactItems: false,
-    compactSignature: false,
-    signatureParens: true,
-    compactNotes: false,
-    closeTable: false,
-  },
   type1: {
     label: 'Type 1',
     description: 'NLQ, bold + underline + wide title',
@@ -205,48 +189,6 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactNotes: false,
     closeTable: true,
   },
-  type2: {
-    label: 'Type 2',
-    description: 'Draft (fast), bold + underline + wide title',
-    nlq: false,
-    bold: true,
-    underline: true,
-    wide: true,
-    doubleStrike: false,
-    compactItems: false,
-    compactSignature: false,
-    signatureParens: true,
-    compactNotes: false,
-    closeTable: false,
-  },
-  type3: {
-    label: 'Type 3',
-    description: 'NLQ, plain: no bold / underline / wide',
-    nlq: true,
-    bold: false,
-    underline: false,
-    wide: false,
-    doubleStrike: false,
-    compactItems: false,
-    compactSignature: false,
-    signatureParens: true,
-    compactNotes: false,
-    closeTable: false,
-  },
-  type4: {
-    label: 'Type 4',
-    description: 'NLQ + double-strike (darker), bold + underline + wide title',
-    nlq: true,
-    bold: true,
-    underline: true,
-    wide: true,
-    doubleStrike: true,
-    compactItems: false,
-    compactSignature: false,
-    signatureParens: true,
-    compactNotes: false,
-    closeTable: false,
-  },
 }
 
 export const ESCP_VARIANT_KEYS = Object.keys(ESCP_VARIANTS) as EscpVariant[]
@@ -255,7 +197,7 @@ export function buildNotaEscpLines(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'control',
+  variant: EscpVariant = 'type1',
 ): EscpLine[] {
   const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
   const closeTableRule = () => {
@@ -495,7 +437,7 @@ export function buildNotaEscp(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'control',
+  variant: EscpVariant = 'type1',
 ): Uint8Array {
   const lines = buildNotaEscpLines(nota, business, docType, variant)
   const opt = ESCP_VARIANTS[variant]
@@ -567,7 +509,7 @@ export async function printNotaEscp(
   business: Business,
   printerName?: string,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'control',
+  variant: EscpVariant = 'type1',
 ): Promise<void> {
   const bytes = buildNotaEscp(nota, business, docType, variant)
   await printRawEscp(bytes, printerName)
@@ -584,7 +526,7 @@ export function printNotaEscpViaBrowser(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'control',
+  variant: EscpVariant = 'type1',
 ): void {
   const lines = buildNotaEscpLines(nota, business, docType, variant)
   const rows = lines

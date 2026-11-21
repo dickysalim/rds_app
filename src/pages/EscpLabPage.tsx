@@ -17,7 +17,7 @@ import { SAMPLE_BUSINESS, SAMPLE_NOTA } from '@/lib/escpSample'
 
 export function EscpLabPage() {
   const [open, setOpen] = useState(true)
-  const [variant, setVariant] = useState<EscpVariant>('control')
+  const [variant, setVariant] = useState<EscpVariant>('type1')
   const [docType, setDocType] = useState<NotaDocType>('nota_pembelian')
   const nota = SAMPLE_NOTA
   const effectiveBusiness = SAMPLE_BUSINESS

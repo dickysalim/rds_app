@@ -4,7 +4,7 @@ export function EscpContent({
   nota,
   business,
   docType = 'nota_pembelian',
-  variant = 'control',
+  variant = 'type1',
   className = '',
 }: {
   nota: NotaDetail | null
