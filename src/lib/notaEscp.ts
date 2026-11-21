@@ -165,6 +165,7 @@ export type EscpVariantOptions = {
   doubleStrike: boolean // ESC G: print each line twice for darker text
   compactItems: boolean // drop the blank row between the table header rule and item 1
   compactSignature: boolean // signature name lines share the row of the last payment line (No. Rek)
+  signatureParens: boolean // wrap the signature name line in ( )
   closeTable: boolean // closing rule overprinted on the last item's row (CR, no LF) instead of its own row
 }
 
@@ -181,6 +182,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     doubleStrike: false,
     compactItems: false,
     compactSignature: false,
+    signatureParens: true,
     closeTable: false,
   },
   type1: {
@@ -193,6 +195,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     doubleStrike: false,
     compactItems: true,
     compactSignature: true,
+    signatureParens: false,
     closeTable: true,
   },
   type2: {
@@ -205,6 +208,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     doubleStrike: false,
     compactItems: false,
     compactSignature: false,
+    signatureParens: true,
     closeTable: false,
   },
   type3: {
@@ -217,6 +221,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     doubleStrike: false,
     compactItems: false,
     compactSignature: false,
+    signatureParens: true,
     closeTable: false,
   },
   type4: {
@@ -229,6 +234,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     doubleStrike: true,
     compactItems: false,
     compactSignature: false,
+    signatureParens: true,
     closeTable: false,
   },
 }
@@ -241,7 +247,7 @@ export function buildNotaEscpLines(
   docType: NotaDocType = 'nota_pembelian',
   variant: EscpVariant = 'control',
 ): EscpLine[] {
-  const { compactItems, closeTable, compactSignature } = ESCP_VARIANTS[variant]
+  const { compactItems, closeTable, compactSignature, signatureParens } = ESCP_VARIANTS[variant]
   const closeTableRule = () => {
     const last = lines[lines.length - 1]
     if (closeTable && nota.items.length > 0 && last && !last.segments) last.overprint = rule
@@ -400,7 +406,7 @@ export function buildNotaEscpLines(
   // Signature labels side by side (left) + payment info (right), on the same rows.
   const signatureBox = (label: string): string[] => {
     const blank = ' '.repeat(BOX_WIDTH)
-    const nameLine = `(${BOX_H.repeat(BOX_WIDTH - 2)})`
+    const nameLine = signatureParens ? `(${BOX_H.repeat(BOX_WIDTH - 2)})` : BOX_H.repeat(BOX_WIDTH - 2)
     // Compact: label, two blank rows, name line. Payment block stays top-aligned
     // with the label row, so the name line lands one row below No. Rek.
     if (compactSignature) return [left(label, BOX_WIDTH), blank, blank, nameLine]
