@@ -70,6 +70,17 @@ export const LINE_UNITS = 36
 // Extra feed after the closing rule so the line below (Subtotal) clears it by
 // the same gap the rule has under the last item.
 export const OVERPRINT_GAP_AFTER = 8
+// Height of a separator (blank) row, in 1/216". A text line is LINE_UNITS (36);
+// 18 is half a line. Lower = tighter; keep it above 0.
+export const BLANK_UNITS = 18
+
+// Vertical advance of one line, in 1/216". The preview, the browser-print
+// fallback and the printer bytes all derive from this, so they can't drift.
+export function lineUnits(l: EscpLine): number {
+  if (l.blank) return BLANK_UNITS
+  if (l.overprint) return LINE_UNITS + OVERPRINT_GAP_AFTER
+  return LINE_UNITS
+}
 
 // Left column for Catatan when it sits beside the totals block; the totals
 // block keeps the remaining right-hand columns.
@@ -149,6 +160,8 @@ export type EscpLine = {
   // last item: an underscore sits at the bottom of its own row, so on a row
   // of its own it always looks a full line away from the item above.
   overprint?: string
+  // Separator row: advances only BLANK_UNITS instead of a full text line.
+  blank?: boolean
 }
 
 export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
@@ -210,6 +223,8 @@ export function buildNotaEscpLines(
   const rule = '_'.repeat(COLS)
   const push = (text: string, opts: Omit<EscpLine, 'text'> = {}) =>
     lines.push({ text: ascii(text), ...opts })
+  // Separator rows between sections: shorter than a text line (see BLANK_UNITS).
+  const pushBlank = () => lines.push({ text: '', blank: true })
 
   // Letterhead
   const name = ascii(business.business_name)
@@ -222,7 +237,7 @@ export function buildNotaEscpLines(
   if (contact) push(contact)
   if (business.business_email) push(`Email: ${business.business_email}`)
   closeTableRule()
-  push('')
+  pushBlank()
 
   {
     const label = isSuratJalan ? 'SURAT JALAN' : 'NOTA PEMBELIAN'
@@ -231,7 +246,7 @@ export function buildNotaEscpLines(
       text: ascii(' '.repeat(padLeft) + label),
       segments: [{ text: ' '.repeat(padLeft) }, { text: label, bold: true, underline: true }],
     })
-    push('')
+    pushBlank()
   }
 
   // Customer (left) + nota meta (right), on the same rows.
@@ -260,7 +275,7 @@ export function buildNotaEscpLines(
       push(l.trimEnd())
     }
   }
-  push('')
+  pushBlank()
   push(rule)
 
   // Items table
@@ -273,7 +288,7 @@ export function buildNotaEscpLines(
       { bold: true },
     )
     closeTableRule()
-    if (!compactItems) push('')
+    if (!compactItems) pushBlank()
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME_SJ)
       nameLines.forEach((nl, i) => {
@@ -303,7 +318,7 @@ export function buildNotaEscpLines(
       { bold: true },
     )
     closeTableRule()
-    if (!compactItems) push('')
+    if (!compactItems) pushBlank()
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME)
       nameLines.forEach((nl, i) => {
@@ -366,7 +381,7 @@ export function buildNotaEscpLines(
   }
 
   if (nota.notes && !(compactNotes && !isSuratJalan)) {
-    push('')
+    pushBlank()
     const catatanLabel = 'Catatan : '
     const wrapped = wrap(nota.notes, COLS - catatanLabel.length)
     wrapped.forEach((l, i) => {
@@ -409,8 +424,8 @@ export function buildNotaEscpLines(
     }
   }
 
-  push('')
-  push('')
+  pushBlank()
+  pushBlank()
   const boxGap = ' '.repeat(BOX_GAP)
   const footerRows = Math.max(hormatBox.length, terimaBox.length, paymentLines.length)
   for (let i = 0; i < footerRows; i++) {
@@ -428,7 +443,7 @@ export function buildNotaEscpLines(
     }
   }
 
-  push('')
+  pushBlank()
 
   return lines
 }
@@ -457,6 +472,10 @@ export function buildNotaEscp(
 
   emit(...CR_LF) // top margin
   for (const l of lines) {
+    if (l.blank) {
+      emit(ESC, 0x4a, BLANK_UNITS) // ESC J n: feed n/216" (shorter than a full line)
+      continue
+    }
     if (l.segments) {
       for (const seg of l.segments) {
         const bold = seg.bold && opt.bold
@@ -551,7 +570,7 @@ export function printNotaEscpViaBrowser(
       const over = l.overprint
         ? `<span style="position:absolute;left:0;top:${(OVERPRINT_DROP * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
         : ''
-      return `<div style="position:relative;height:${20 + (l.overprint ? (OVERPRINT_GAP_AFTER * 20) / LINE_UNITS : 0)}px;${style}">${content}${over}</div>`
+      return `<div style="position:relative;height:${(lineUnits(l) * 20) / LINE_UNITS}px;${style}">${content}${over}</div>`
     })
     .join('')
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
