@@ -17,7 +17,7 @@ import { SAMPLE_BUSINESS, SAMPLE_NOTA } from '@/lib/escpSample'
 
 export function EscpLabPage() {
   const [open, setOpen] = useState(true)
-  const [variant, setVariant] = useState<EscpVariant>('type1')
+  const [variant, setVariant] = useState<EscpVariant>('control')
   const [docType, setDocType] = useState<NotaDocType>('nota_pembelian')
   const nota = SAMPLE_NOTA
   const effectiveBusiness = SAMPLE_BUSINESS
@@ -43,7 +43,7 @@ export function EscpLabPage() {
           </DialogHeader>
           {(
             <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   {ESCP_VARIANT_KEYS.map((key) => (
                     <Button
@@ -57,7 +57,7 @@ export function EscpLabPage() {
                     </Button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{ESCP_VARIANTS[variant].description}</p>
+                <p className="text-base leading-relaxed text-muted-foreground">{ESCP_VARIANTS[variant].description}</p>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <Select value={docType} onValueChange={(v) => setDocType(v as NotaDocType)}>

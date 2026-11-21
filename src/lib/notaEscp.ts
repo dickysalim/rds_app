@@ -139,7 +139,7 @@ export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
 // (init codes + style on/off), not the 80-column text layout, so a user can
 // print Type 1..4 back-to-back and compare on the real printer. Edit the
 // options below to tune a type; add a type by extending this table.
-export type EscpVariant = 'type1' | 'type2' | 'type3' | 'type4'
+export type EscpVariant = 'control' | 'type1' | 'type2' | 'type3' | 'type4'
 
 export type EscpVariantOptions = {
   label: string
@@ -152,9 +152,20 @@ export type EscpVariantOptions = {
 }
 
 export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
+  // Control: byte-for-byte what production prints today. Never tune this one;
+  // it is the baseline every other type is compared against.
+  control: {
+    label: 'Control',
+    description: 'This is what the production use',
+    nlq: true,
+    bold: true,
+    underline: true,
+    wide: true,
+    doubleStrike: false,
+  },
   type1: {
     label: 'Type 1',
-    description: 'NLQ, bold + underline + wide title (current production output)',
+    description: 'NLQ, bold + underline + wide title',
     nlq: true,
     bold: true,
     underline: true,
@@ -400,7 +411,7 @@ export function buildNotaEscp(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'type1',
+  variant: EscpVariant = 'control',
 ): Uint8Array {
   const lines = buildNotaEscpLines(nota, business, docType)
   const opt = ESCP_VARIANTS[variant]
@@ -464,7 +475,7 @@ export async function printNotaEscp(
   business: Business,
   printerName?: string,
   docType: NotaDocType = 'nota_pembelian',
-  variant: EscpVariant = 'type1',
+  variant: EscpVariant = 'control',
 ): Promise<void> {
   const bytes = buildNotaEscp(nota, business, docType, variant)
   await printRawEscp(bytes, printerName)
