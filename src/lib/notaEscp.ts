@@ -279,7 +279,7 @@ export function buildNotaEscpLines(
     .join(' - ')
   if (contact) push(contact)
   if (business.business_email) push(`Email: ${business.business_email}`)
-  push(rule)
+  closeTableRule()
   push('')
 
   {
