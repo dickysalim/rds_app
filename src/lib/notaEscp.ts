@@ -67,6 +67,9 @@ const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 // a whole row away. Tune this one number to move the rule up or down.
 export const OVERPRINT_DROP = 8
 export const LINE_UNITS = 36
+// Extra feed after the closing rule so the line below (Subtotal) clears it by
+// the same gap the rule has under the last item.
+export const OVERPRINT_GAP_AFTER = 8
 
 const BOX_WIDTH = 20
 const BOX_GAP = 2
@@ -488,7 +491,7 @@ export function buildNotaEscp(
       emit(ESC, 0x4a, OVERPRINT_DROP) // ESC J n: feed n/216" down, no CR
       text(l.overprint)
       emit(0x0d) // CR
-      emit(ESC, 0x4a, LINE_UNITS - OVERPRINT_DROP) // feed the rest of the line
+      emit(ESC, 0x4a, LINE_UNITS - OVERPRINT_DROP + OVERPRINT_GAP_AFTER) // finish the line + clear gap
     } else {
       emit(...CR_LF)
     }
@@ -555,7 +558,7 @@ export function printNotaEscpViaBrowser(
       const over = l.overprint
         ? `<span style="position:absolute;left:0;top:${(OVERPRINT_DROP * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
         : ''
-      return `<div style="position:relative;height:20px;${style}">${content}${over}</div>`
+      return `<div style="position:relative;height:${20 + (l.overprint ? (OVERPRINT_GAP_AFTER * 20) / LINE_UNITS : 0)}px;${style}">${content}${over}</div>`
     })
     .join('')
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>

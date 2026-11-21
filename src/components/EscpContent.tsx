@@ -1,4 +1,4 @@
-import { buildNotaEscpLines, LINE_UNITS, OVERPRINT_DROP, type Business, type NotaDetail, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
+import { buildNotaEscpLines, LINE_UNITS, OVERPRINT_DROP, OVERPRINT_GAP_AFTER, type Business, type NotaDetail, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
 
 export function EscpContent({
   nota,
@@ -27,7 +27,7 @@ export function EscpContent({
             className={[l.bold && 'font-bold', l.underline && 'underline'].filter(Boolean).join(' ') || undefined}
             style={{
               position: 'relative',
-              height: '20px',
+              height: `${20 + (l.overprint ? (OVERPRINT_GAP_AFTER * 20) / LINE_UNITS : 0)}px`,
               ...(l.wide ? { letterSpacing: '0.12em' } : undefined),
             }}
           >
