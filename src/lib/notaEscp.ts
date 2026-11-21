@@ -443,7 +443,7 @@ export function buildNotaEscp(
   docType: NotaDocType = 'nota_pembelian',
   variant: EscpVariant = 'control',
 ): Uint8Array {
-  const lines = buildNotaEscpLines(nota, business, docType)
+  const lines = buildNotaEscpLines(nota, business, docType, variant)
   const opt = ESCP_VARIANTS[variant]
 
   // Bytes
