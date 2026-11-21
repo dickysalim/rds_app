@@ -308,7 +308,7 @@ export function buildNotaEscpLines(
       ),
       { bold: true },
     )
-    push(rule)
+    closeTableRule()
     if (!compactItems) push('')
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME_SJ)
@@ -338,7 +338,7 @@ export function buildNotaEscpLines(
       ].join(gap),
       { bold: true },
     )
-    push(rule)
+    closeTableRule()
     if (!compactItems) push('')
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME)
