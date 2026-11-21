@@ -164,6 +164,7 @@ export type EscpVariantOptions = {
   wide: boolean // honor double-width title (ESC W 1 / ESC W 0)
   doubleStrike: boolean // ESC G: print each line twice for darker text
   compactItems: boolean // drop the blank row between the table header rule and item 1
+  compactSignature: boolean // signature name lines share the row of the last payment line (No. Rek)
   closeTable: boolean // closing rule overprinted on the last item's row (CR, no LF) instead of its own row
 }
 
@@ -179,6 +180,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: false,
+    compactSignature: false,
     closeTable: false,
   },
   type1: {
@@ -190,6 +192,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: true,
+    compactSignature: true,
     closeTable: true,
   },
   type2: {
@@ -201,6 +204,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: false,
+    compactSignature: false,
     closeTable: false,
   },
   type3: {
@@ -212,6 +216,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: false,
     doubleStrike: false,
     compactItems: false,
+    compactSignature: false,
     closeTable: false,
   },
   type4: {
@@ -223,6 +228,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: true,
     compactItems: false,
+    compactSignature: false,
     closeTable: false,
   },
 }
@@ -235,7 +241,7 @@ export function buildNotaEscpLines(
   docType: NotaDocType = 'nota_pembelian',
   variant: EscpVariant = 'control',
 ): EscpLine[] {
-  const { compactItems, closeTable } = ESCP_VARIANTS[variant]
+  const { compactItems, closeTable, compactSignature } = ESCP_VARIANTS[variant]
   const closeTableRule = () => {
     const last = lines[lines.length - 1]
     if (closeTable && nota.items.length > 0 && last && !last.segments) last.overprint = rule
@@ -395,6 +401,9 @@ export function buildNotaEscpLines(
   const signatureBox = (label: string): string[] => {
     const blank = ' '.repeat(BOX_WIDTH)
     const nameLine = `(${BOX_H.repeat(BOX_WIDTH - 2)})`
+    // Compact: label, one blank row, name line -- the name line lands on the
+    // third footer row, the same row as the payment block's last line.
+    if (compactSignature) return [left(label, BOX_WIDTH), blank, nameLine]
     return [left(label, BOX_WIDTH), blank, blank, blank, blank, nameLine]
   }
   const hormatBox = signatureBox('Hormat Kami,')
