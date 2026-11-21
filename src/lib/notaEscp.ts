@@ -401,9 +401,8 @@ export function buildNotaEscpLines(
   const signatureBox = (label: string): string[] => {
     const blank = ' '.repeat(BOX_WIDTH)
     const nameLine = `(${BOX_H.repeat(BOX_WIDTH - 2)})`
-    // Compact: label, two blank rows, name line. The labels sit one row above
-    // the payment block (see the pad below), so the name line still lands on
-    // the same row as the payment block's last line (No. Rek).
+    // Compact: label, two blank rows, name line. Payment block stays top-aligned
+    // with the label row, so the name line lands one row below No. Rek.
     if (compactSignature) return [left(label, BOX_WIDTH), blank, blank, nameLine]
     return [left(label, BOX_WIDTH), blank, blank, blank, blank, nameLine]
   }
@@ -424,11 +423,6 @@ export function buildNotaEscpLines(
     if (business.payment_account_number) {
       paymentLines.push({ text: `No. Rek : ${business.payment_account_number}` })
     }
-  }
-
-  if (compactSignature && paymentLines.length > 0) {
-    const pad = Math.max(0, hormatBox.length - paymentLines.length)
-    for (let k = 0; k < pad; k++) paymentLines.unshift({ text: '' })
   }
 
   push('')
