@@ -26,6 +26,7 @@ export function EscpContent({
             key={i}
             className={[l.bold && 'font-bold', l.underline && 'underline'].filter(Boolean).join(' ') || undefined}
             style={{
+              position: 'relative',
               height: '20px',
               ...(l.wide ? { letterSpacing: '0.12em' } : undefined),
             }}
@@ -42,6 +43,7 @@ export function EscpContent({
                   </span>
                 ))
               : l.text || ' '}
+            {l.overprint && <span className="absolute left-0 top-0">{l.overprint}</span>}
           </div>
         ))}
       </pre>

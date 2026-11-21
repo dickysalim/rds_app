@@ -131,6 +131,11 @@ export type EscpLine = {
   wide?: boolean
   underline?: boolean
   segments?: EscpSegment[]
+  // Printed on the same row after a bare CR (no line feed), so the glyphs
+  // overstrike the row's text. Used to seat the closing rule right under the
+  // last item: an underscore sits at the bottom of its own row, so on a row
+  // of its own it always looks a full line away from the item above.
+  overprint?: string
 }
 
 export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
@@ -150,6 +155,7 @@ export type EscpVariantOptions = {
   wide: boolean // honor double-width title (ESC W 1 / ESC W 0)
   doubleStrike: boolean // ESC G: print each line twice for darker text
   compactItems: boolean // drop the blank row between the table header rule and item 1
+  closeTable: boolean // closing rule overprinted on the last item's row (CR, no LF) instead of its own row
 }
 
 export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
@@ -164,6 +170,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: false,
+    closeTable: false,
   },
   type1: {
     label: 'Type 1',
@@ -174,6 +181,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: true,
+    closeTable: true,
   },
   type2: {
     label: 'Type 2',
@@ -184,6 +192,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: false,
     compactItems: false,
+    closeTable: false,
   },
   type3: {
     label: 'Type 3',
@@ -194,6 +203,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: false,
     doubleStrike: false,
     compactItems: false,
+    closeTable: false,
   },
   type4: {
     label: 'Type 4',
@@ -204,6 +214,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     wide: true,
     doubleStrike: true,
     compactItems: false,
+    closeTable: false,
   },
 }
 
@@ -215,7 +226,12 @@ export function buildNotaEscpLines(
   docType: NotaDocType = 'nota_pembelian',
   variant: EscpVariant = 'control',
 ): EscpLine[] {
-  const compactItems = ESCP_VARIANTS[variant].compactItems
+  const { compactItems, closeTable } = ESCP_VARIANTS[variant]
+  const closeTableRule = () => {
+    const last = lines[lines.length - 1]
+    if (closeTable && nota.items.length > 0 && last && !last.segments) last.overprint = rule
+    else push(rule)
+  }
   const isSuratJalan = docType === 'surat_jalan'
   const lines: EscpLine[] = []
   const rule = '_'.repeat(COLS)
@@ -300,7 +316,7 @@ export function buildNotaEscpLines(
         )
       })
     })
-    push(rule)
+    closeTableRule()
   } else {
     push(
       [
@@ -332,7 +348,7 @@ export function buildNotaEscpLines(
         )
       })
     })
-    push(rule)
+    closeTableRule()
     const totalLabelWidth = COLS - COL_TOTAL - COL_GAP
     if (nota.pajak_name && nota.pajak_percentage != null) {
       const pajakValue = (nota.total_price * nota.pajak_percentage) / 100
@@ -461,6 +477,10 @@ export function buildNotaEscp(
       if (underline) emit(ESC, 0x2d, 0x00) // underline off
       if (bold) emit(ESC, 0x46) // bold off
     }
+    if (l.overprint) {
+      emit(0x0d) // CR only: back to column 1, same row
+      text(l.overprint)
+    }
     emit(...CR_LF)
   }
 
@@ -522,7 +542,10 @@ export function printNotaEscpViaBrowser(
             })
             .join('')
         : escapeHtml(l.text) || '&nbsp;'
-      return `<div style="height:20px;${style}">${content}</div>`
+      const over = l.overprint
+        ? `<span style="position:absolute;left:0;top:0">${escapeHtml(l.overprint)}</span>`
+        : ''
+      return `<div style="position:relative;height:20px;${style}">${content}${over}</div>`
     })
     .join('')
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
