@@ -44,7 +44,7 @@ export function EscpContent({
                 ))
               : l.text || ' '}
             {l.overprint && (
-              <span className="absolute left-0" style={{ top: `${(OVERPRINT_DROP * 20) / LINE_UNITS}px` }}>
+              <span className="absolute left-0" style={{ top: `${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px` }}>
                 {l.overprint}
               </span>
             )}

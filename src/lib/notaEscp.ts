@@ -67,6 +67,9 @@ const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 // a whole row away. Tune this one number to move the rule up or down.
 export const OVERPRINT_DROP = 8
 export const LINE_UNITS = 36
+// Wider drop for the rule that closes the customer block, standing in for the
+// small blank that used to sit above it.
+export const OVERPRINT_DROP_WIDE = 16
 // Extra feed after the closing rule so the line below (Subtotal) clears it by
 // the same gap the rule has under the last item.
 export const OVERPRINT_GAP_AFTER = 8
@@ -160,6 +163,7 @@ export type EscpLine = {
   // last item: an underscore sits at the bottom of its own row, so on a row
   // of its own it always looks a full line away from the item above.
   overprint?: string
+  overprintDrop?: number // override OVERPRINT_DROP for this line's overprint
   // Separator row: advances only BLANK_UNITS instead of a full text line.
   blank?: boolean
 }
@@ -213,9 +217,12 @@ export function buildNotaEscpLines(
   variant: EscpVariant = 'type1',
 ): EscpLine[] {
   const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
-  const closeTableRule = () => {
+  const closeTableRule = (drop?: number) => {
     const last = lines[lines.length - 1]
-    if (closeTable && nota.items.length > 0 && last) last.overprint = rule
+    if (closeTable && nota.items.length > 0 && last) {
+      last.overprint = rule
+      last.overprintDrop = drop
+    }
     else push(rule)
   }
   const isSuratJalan = docType === 'surat_jalan'
@@ -275,9 +282,10 @@ export function buildNotaEscpLines(
       push(l.trimEnd())
     }
   }
-  // Type 1: rule overprinted just under the last customer row, no blank above it.
+  // Type 1: rule overprinted under the last customer row, dropped a bit further
+  // than the other rules to keep a small gap instead of a blank row.
   if (!closeTable) pushBlank()
-  closeTableRule()
+  closeTableRule(OVERPRINT_DROP_WIDE)
 
   // Items table
   const gap = ' '.repeat(COL_GAP)
@@ -501,10 +509,11 @@ export function buildNotaEscp(
     }
     if (l.overprint) {
       emit(0x0d) // CR only: back to column 1, same row
-      emit(ESC, 0x4a, OVERPRINT_DROP) // ESC J n: feed n/216" down, no CR
+      const drop = l.overprintDrop ?? OVERPRINT_DROP
+      emit(ESC, 0x4a, drop) // ESC J n: feed n/216" down, no CR
       text(l.overprint)
       emit(0x0d) // CR
-      emit(ESC, 0x4a, LINE_UNITS - OVERPRINT_DROP + OVERPRINT_GAP_AFTER) // finish the line + clear gap
+      emit(ESC, 0x4a, LINE_UNITS - drop + OVERPRINT_GAP_AFTER) // finish the line + clear gap
     } else {
       emit(...CR_LF)
     }
@@ -569,7 +578,7 @@ export function printNotaEscpViaBrowser(
             .join('')
         : escapeHtml(l.text) || '&nbsp;'
       const over = l.overprint
-        ? `<span style="position:absolute;left:0;top:${(OVERPRINT_DROP * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
+        ? `<span style="position:absolute;left:0;top:${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
         : ''
       return `<div style="position:relative;height:${(lineUnits(l) * 20) / LINE_UNITS}px;${style}">${content}${over}</div>`
     })
