@@ -71,6 +71,10 @@ export const LINE_UNITS = 36
 // the same gap the rule has under the last item.
 export const OVERPRINT_GAP_AFTER = 8
 
+// Left column for Catatan when it sits beside the totals block; the totals
+// block keeps the remaining right-hand columns.
+const NOTES_WIDTH = 44
+
 const BOX_WIDTH = 20
 const BOX_GAP = 2
 const PAYMENT_WIDTH = COLS - BOX_WIDTH * 2 - BOX_GAP * 2
@@ -166,6 +170,7 @@ export type EscpVariantOptions = {
   compactItems: boolean // drop the blank row between the table header rule and item 1
   compactSignature: boolean // signature name lines share the row of the last payment line (No. Rek)
   signatureParens: boolean // wrap the signature name line in ( )
+  compactNotes: boolean // Catatan beside the totals block (Nota Pembelian) instead of below it
   closeTable: boolean // closing rule overprinted on the last item's row (CR, no LF) instead of its own row
 }
 
@@ -183,6 +188,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: false,
     compactSignature: false,
     signatureParens: true,
+    compactNotes: false,
     closeTable: false,
   },
   type1: {
@@ -196,6 +202,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: true,
     compactSignature: true,
     signatureParens: false,
+    compactNotes: true,
     closeTable: true,
   },
   type2: {
@@ -209,6 +216,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: false,
     compactSignature: false,
     signatureParens: true,
+    compactNotes: false,
     closeTable: false,
   },
   type3: {
@@ -222,6 +230,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: false,
     compactSignature: false,
     signatureParens: true,
+    compactNotes: false,
     closeTable: false,
   },
   type4: {
@@ -235,6 +244,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: false,
     compactSignature: false,
     signatureParens: true,
+    compactNotes: false,
     closeTable: false,
   },
 }
@@ -247,7 +257,7 @@ export function buildNotaEscpLines(
   docType: NotaDocType = 'nota_pembelian',
   variant: EscpVariant = 'control',
 ): EscpLine[] {
-  const { compactItems, closeTable, compactSignature, signatureParens } = ESCP_VARIANTS[variant]
+  const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
   const closeTableRule = () => {
     const last = lines[lines.length - 1]
     if (closeTable && nota.items.length > 0 && last && !last.segments) last.overprint = rule
@@ -371,23 +381,49 @@ export function buildNotaEscpLines(
     })
     closeTableRule()
     const totalLabelWidth = COLS - COL_TOTAL - COL_GAP
+    const totalsRows: { text: string; bold?: boolean }[] = []
     if (nota.pajak_name && nota.pajak_percentage != null) {
       const pajakValue = (nota.total_price * nota.pajak_percentage) / 100
-      push(`${right('Subtotal', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`)
-      push(
-        `${right(`${nota.pajak_name} (${nota.pajak_percentage}%)`, totalLabelWidth)}${gap}${right(fmt(pajakValue), COL_TOTAL)}`,
-      )
-      push(`${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price + pajakValue), COL_TOTAL)}`, {
+      totalsRows.push({ text: `${right('Subtotal', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}` })
+      totalsRows.push({
+        text: `${right(`${nota.pajak_name} (${nota.pajak_percentage}%)`, totalLabelWidth)}${gap}${right(fmt(pajakValue), COL_TOTAL)}`,
+      })
+      totalsRows.push({
+        text: `${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price + pajakValue), COL_TOTAL)}`,
         bold: true,
       })
     } else {
-      push(`${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`, {
+      totalsRows.push({
+        text: `${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`,
         bold: true,
       })
     }
+
+    if (compactNotes && nota.notes) {
+      // Catatan sits left of the totals block, on the same rows. Long notes
+      // wrap inside NOTES_WIDTH and keep running down the left column below
+      // the totals rows (the right side just stays blank there).
+      const catatanLabel = 'Catatan : '
+      const noteLines = wrap(nota.notes, NOTES_WIDTH - catatanLabel.length)
+      const rows = Math.max(noteLines.length, totalsRows.length)
+      for (let i = 0; i < rows; i++) {
+        const leftSegs: EscpSegment[] =
+          i < noteLines.length
+            ? i === 0
+              ? [{ text: ascii(catatanLabel), bold: true }, { text: left(noteLines[i], NOTES_WIDTH - catatanLabel.length) }]
+              : [{ text: left(' '.repeat(catatanLabel.length) + noteLines[i], NOTES_WIDTH) }]
+            : [{ text: ' '.repeat(NOTES_WIDTH) }]
+        const t = totalsRows[i]
+        const segments: EscpSegment[] = [...leftSegs]
+        if (t) segments.push({ text: t.text.slice(NOTES_WIDTH), bold: t.bold })
+        lines.push({ text: ascii(segments.map((x) => x.text).join('').trimEnd()), segments })
+      }
+    } else {
+      totalsRows.forEach((t) => push(t.text, t.bold ? { bold: true } : {}))
+    }
   }
 
-  if (nota.notes) {
+  if (nota.notes && !(compactNotes && !isSuratJalan)) {
     push('')
     const catatanLabel = 'Catatan : '
     const wrapped = wrap(nota.notes, COLS - catatanLabel.length)

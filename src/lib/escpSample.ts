@@ -19,7 +19,7 @@ export const SAMPLE_NOTA: NotaDetail = {
   "customer_company_name_snapshot": "UD Gift & Craft Indah",
   "customer_address_snapshot": "Jl. Margonda Raya No. 101, Depok",
   "contact_name_snapshot": "Rudi Hartono",
-  "notes": "Customer PO: PO/2610/9-008",
+  "notes": "Customer PO: PO/2610/9-008. Kirim sebelum Jumat sore ke gudang belakang (pintu hijau), hubungi Pak Rudi 081234567809 sebelum tiba. Mika dibungkus plastik per 50 lembar, alas kardus, maks 10 dus ditumpuk.",
   "pajak_name": "PPN",
   "pajak_percentage": 11,
   "total_price": 6370250,
