@@ -22,7 +22,7 @@ export const SAMPLE_NOTA: NotaDetail = {
   "notes": "Customer PO: PO/2610/9-008",
   "pajak_name": "PPN",
   "pajak_percentage": 11,
-  "total_price": 5225750,
+  "total_price": 6370250,
   "items": [
     {
       "item_name_snapshot": "Mika Warna (Merah/Biru/Kuning)",
@@ -72,6 +72,27 @@ export const SAMPLE_NOTA: NotaDetail = {
       "qty": 190,
       "price": 1500,
       "total_price": 285000
+    },
+    {
+      "item_name_snapshot": "Mika Lembar Bening 0.8mm",
+      "unit_snapshot": "lembar",
+      "qty": 120,
+      "price": 2600,
+      "total_price": 312000
+    },
+    {
+      "item_name_snapshot": "Plastik PE Bening 40x60",
+      "unit_snapshot": "pack",
+      "qty": 85,
+      "price": 4500,
+      "total_price": 382500
+    },
+    {
+      "item_name_snapshot": "Lakban Bening 48mm",
+      "unit_snapshot": "roll",
+      "qty": 60,
+      "price": 7500,
+      "total_price": 450000
     }
   ]
 }
