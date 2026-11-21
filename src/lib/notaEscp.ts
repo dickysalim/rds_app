@@ -202,7 +202,7 @@ export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
     compactItems: true,
     compactSignature: true,
     signatureParens: false,
-    compactNotes: true,
+    compactNotes: false,
     closeTable: true,
   },
   type2: {
