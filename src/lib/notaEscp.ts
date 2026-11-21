@@ -573,7 +573,6 @@ export function printNotaEscpViaBrowser(
       const style = [
         l.bold && 'font-weight:bold',
         l.underline && 'text-decoration:underline',
-        l.wide && 'letter-spacing:0.12em',
       ]
         .filter(Boolean)
         .join(';')
@@ -586,7 +585,9 @@ export function printNotaEscpViaBrowser(
               return `<span style="${segStyle}">${escapeHtml(s.text)}</span>`
             })
             .join('')
-        : escapeHtml(l.text) || '&nbsp;'
+        : l.wide
+          ? `<span style="display:inline-block;transform:scaleX(2);transform-origin:left">${escapeHtml(l.text)}</span>`
+          : escapeHtml(l.text) || '&nbsp;'
       const over = l.overprint
         ? `<span style="position:absolute;left:0;top:${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
         : ''
