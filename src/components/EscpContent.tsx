@@ -28,6 +28,7 @@ export function EscpContent({
             style={{
               position: 'relative',
               height: `${(lineUnits(l) * 20) / LINE_UNITS}px`,
+              ...(l.wide ? { letterSpacing: '0.12em' } : undefined),
             }}
           >
             {l.segments
@@ -41,14 +42,7 @@ export function EscpContent({
                     {s.text}
                   </span>
                 ))
-              : l.wide
-                ? (
-                    // ESC W 1: printer draws each glyph at double width (2 columns).
-                    <span className="inline-block origin-left" style={{ transform: 'scaleX(2)' }}>
-                      {l.text}
-                    </span>
-                  )
-                : l.text || ' '}
+              : l.text || ' '}
             {l.overprint && (
               <span className="absolute left-0" style={{ top: `${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px` }}>
                 {l.overprint}
