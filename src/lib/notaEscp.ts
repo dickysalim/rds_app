@@ -107,6 +107,63 @@ export type EscpLine = {
 
 export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
 
+// Rapid-test variants: each one changes only the printer-side ESC/P commands
+// (init codes + style on/off), not the 80-column text layout, so a user can
+// print Type 1..4 back-to-back and compare on the real printer. Edit the
+// options below to tune a type; add a type by extending this table.
+export type EscpVariant = 'type1' | 'type2' | 'type3' | 'type4'
+
+export type EscpVariantOptions = {
+  label: string
+  description: string
+  nlq: boolean // ESC x 1: letter quality, slower but cleaner
+  bold: boolean // honor bold lines/segments (ESC E / ESC F)
+  underline: boolean // honor underline (ESC - 1 / ESC - 0)
+  wide: boolean // honor double-width title (ESC W 1 / ESC W 0)
+  doubleStrike: boolean // ESC G: print each line twice for darker text
+}
+
+export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
+  type1: {
+    label: 'Type 1',
+    description: 'NLQ, bold + underline + wide title (current production output)',
+    nlq: true,
+    bold: true,
+    underline: true,
+    wide: true,
+    doubleStrike: false,
+  },
+  type2: {
+    label: 'Type 2',
+    description: 'Draft (fast), bold + underline + wide title',
+    nlq: false,
+    bold: true,
+    underline: true,
+    wide: true,
+    doubleStrike: false,
+  },
+  type3: {
+    label: 'Type 3',
+    description: 'NLQ, plain: no bold / underline / wide',
+    nlq: true,
+    bold: false,
+    underline: false,
+    wide: false,
+    doubleStrike: false,
+  },
+  type4: {
+    label: 'Type 4',
+    description: 'NLQ + double-strike (darker), bold + underline + wide title',
+    nlq: true,
+    bold: true,
+    underline: true,
+    wide: true,
+    doubleStrike: true,
+  },
+}
+
+export const ESCP_VARIANT_KEYS = Object.keys(ESCP_VARIANTS) as EscpVariant[]
+
 export function buildNotaEscpLines(
   nota: NotaDetail,
   business: Business,
@@ -311,8 +368,14 @@ export function buildNotaEscpLines(
   return lines
 }
 
-export function buildNotaEscp(nota: NotaDetail, business: Business, docType: NotaDocType = 'nota_pembelian'): Uint8Array {
+export function buildNotaEscp(
+  nota: NotaDetail,
+  business: Business,
+  docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
+): Uint8Array {
   const lines = buildNotaEscpLines(nota, business, docType)
+  const opt = ESCP_VARIANTS[variant]
 
   // Bytes
   const bytes: number[] = []
@@ -323,27 +386,33 @@ export function buildNotaEscp(nota: NotaDetail, business: Business, docType: Not
 
   emit(ESC, 0x40) // ESC @ — reset
   emit(ESC, 0x50) // ESC P — 10 cpi
-  emit(ESC, 0x78, 0x01) // ESC x 1 — NLQ (letter quality)
+  emit(ESC, 0x78, opt.nlq ? 0x01 : 0x00) // ESC x n — NLQ (letter quality) on/off
+  if (opt.doubleStrike) emit(ESC, 0x47) // ESC G — double-strike on
   emit(ESC, 0x32) // ESC 2 — 1/6" line spacing
 
   emit(...CR_LF) // top margin
   for (const l of lines) {
     if (l.segments) {
       for (const seg of l.segments) {
-        if (seg.bold) emit(ESC, 0x45) // bold on
-        if (seg.underline) emit(ESC, 0x2d, 0x01) // underline on
+        const bold = seg.bold && opt.bold
+        const underline = seg.underline && opt.underline
+        if (bold) emit(ESC, 0x45) // bold on
+        if (underline) emit(ESC, 0x2d, 0x01) // underline on
         text(seg.text)
-        if (seg.underline) emit(ESC, 0x2d, 0x00) // underline off
-        if (seg.bold) emit(ESC, 0x46) // bold off
+        if (underline) emit(ESC, 0x2d, 0x00) // underline off
+        if (bold) emit(ESC, 0x46) // bold off
       }
     } else {
-      if (l.bold) emit(ESC, 0x45) // bold on
-      if (l.underline) emit(ESC, 0x2d, 0x01) // ESC - 1 — underline on
-      if (l.wide) emit(ESC, 0x57, 0x01) // double width on
+      const bold = l.bold && opt.bold
+      const underline = l.underline && opt.underline
+      const wide = l.wide && opt.wide
+      if (bold) emit(ESC, 0x45) // bold on
+      if (underline) emit(ESC, 0x2d, 0x01) // ESC - 1 — underline on
+      if (wide) emit(ESC, 0x57, 0x01) // double width on
       text(l.text)
-      if (l.wide) emit(ESC, 0x57, 0x00)
-      if (l.underline) emit(ESC, 0x2d, 0x00) // underline off
-      if (l.bold) emit(ESC, 0x46) // bold off
+      if (wide) emit(ESC, 0x57, 0x00)
+      if (underline) emit(ESC, 0x2d, 0x00) // underline off
+      if (bold) emit(ESC, 0x46) // bold off
     }
     emit(...CR_LF)
   }
@@ -357,6 +426,7 @@ export function buildNotaEscp(nota: NotaDetail, business: Business, docType: Not
   // mid-sheet instead of at the top of the next one.
   emit(ESC, 0x43, 0x00, PAGE_LENGTH_INCHES)
   emit(FF) // eject to next page top
+  if (opt.doubleStrike) emit(ESC, 0x48) // ESC H — double-strike off
 
   return new Uint8Array(bytes)
 }
@@ -366,8 +436,9 @@ export async function printNotaEscp(
   business: Business,
   printerName?: string,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
 ): Promise<void> {
-  const bytes = buildNotaEscp(nota, business, docType)
+  const bytes = buildNotaEscp(nota, business, docType, variant)
   await printRawEscp(bytes, printerName)
 }
 
