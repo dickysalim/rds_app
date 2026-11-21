@@ -71,10 +71,11 @@ export const LINE_UNITS = 36
 //  - DROP below the last customer row = the gap the title ("NOTA PEMBELIAN")
 //    has under the letterhead rule above it (33).
 //  - AFTER = feed from that rule to the table header row, sized so the header
-//    text clears the rule by the same 8 it has above the rule below it (29 =
-//    8 + ~21 of glyph height).
+//    text clears the rule by the same space it has above the rule below it
+//    (measured in the preview with font metrics: 34 gives ~5.7px above vs
+//    ~5.9px below).
 export const CUSTOMER_RULE_DROP = 33
-export const CUSTOMER_RULE_AFTER = 29
+export const CUSTOMER_RULE_AFTER = 34
 // Extra feed after the closing rule so the line below (Subtotal) clears it by
 // the same gap the rule has under the last item.
 export const OVERPRINT_GAP_AFTER = 8
