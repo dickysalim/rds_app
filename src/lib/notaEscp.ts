@@ -215,7 +215,7 @@ export function buildNotaEscpLines(
   const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
   const closeTableRule = () => {
     const last = lines[lines.length - 1]
-    if (closeTable && nota.items.length > 0 && last && !last.segments) last.overprint = rule
+    if (closeTable && nota.items.length > 0 && last) last.overprint = rule
     else push(rule)
   }
   const isSuratJalan = docType === 'surat_jalan'
@@ -275,8 +275,9 @@ export function buildNotaEscpLines(
       push(l.trimEnd())
     }
   }
-  pushBlank()
-  push(rule)
+  // Type 1: rule overprinted just under the last customer row, no blank above it.
+  if (!closeTable) pushBlank()
+  closeTableRule()
 
   // Items table
   const gap = ' '.repeat(COL_GAP)
