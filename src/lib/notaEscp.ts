@@ -1,6 +1,34 @@
-import type { Business } from '@/lib/business'
-import type { NotaDetail } from '@/lib/nota'
 import { printRawEscp } from '@/lib/qzPrint'
+
+export interface Business {
+  business_name: string
+  business_address: string | null
+  business_contact_person: string | null
+  business_contact_number: string | null
+  business_email: string | null
+  payment_bank_name: string | null
+  payment_account_name: string | null
+  payment_account_number: string | null
+}
+
+export interface NotaDetail {
+  nota_number: string
+  nota_date: string
+  customer_company_name_snapshot: string
+  customer_address_snapshot: string | null
+  contact_name_snapshot: string | null
+  total_price: number
+  notes: string | null
+  pajak_name: string | null
+  pajak_percentage: number | null
+  items: {
+    item_name_snapshot: string
+    unit_snapshot: string
+    qty: number
+    price: number
+    total_price: number
+  }[]
+}
 
 // Raw ESC/P output for the Epson LX-310 (9-pin dot matrix). Text-only: sent
 // straight to the printer's own character generator, so it prints in a

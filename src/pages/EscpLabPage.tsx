@@ -13,28 +13,16 @@ import {
   type EscpVariant,
   type NotaDocType,
 } from '@/lib/notaEscp'
-import { useBusinessAliasesQuery, useBusinessQuery, useNotaDetailQuery } from '@/lib/queries'
-
-// Longest nota on the staging DB (7 items + notes), used as the fixed sample
-// for every ESC/P variant so prints are comparable side by side.
-const LAB_NOTA_ID = 88
+import { SAMPLE_BUSINESS, SAMPLE_NOTA } from '@/lib/escpSample'
 
 export function EscpLabPage() {
   const [open, setOpen] = useState(true)
   const [variant, setVariant] = useState<EscpVariant>('type1')
   const [docType, setDocType] = useState<NotaDocType>('nota_pembelian')
-  const { data: nota, isError } = useNotaDetailQuery(LAB_NOTA_ID)
-  const { data: business } = useBusinessQuery()
-  const { data: businessAliases = [] } = useBusinessAliasesQuery()
-
-  const businessOptions = [...(business ? [business] : []), ...businessAliases]
-  const effectiveBusiness =
-    (nota?.business_id != null
-      ? businessOptions.find((b) => b.business_id === nota.business_id)
-      : undefined) ?? business
+  const nota = SAMPLE_NOTA
+  const effectiveBusiness = SAMPLE_BUSINESS
 
   async function handlePrint() {
-    if (!nota || !effectiveBusiness) return
     try {
       await printNotaEscp(nota, effectiveBusiness, undefined, docType, variant)
       toast.success(`Sent to printer (${ESCP_VARIANTS[variant].label})`)
@@ -51,11 +39,9 @@ export function EscpLabPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-6xl flex-col sm:max-w-6xl">
           <DialogHeader>
-            <DialogTitle>{nota?.nota_number ?? 'Nota'}</DialogTitle>
+            <DialogTitle>{nota.nota_number}</DialogTitle>
           </DialogHeader>
-          {isError ? (
-            <p className="py-8 text-center text-sm text-destructive">Failed to load nota {LAB_NOTA_ID}</p>
-          ) : (
+          {(
             <div className="flex min-h-0 flex-1 flex-col gap-2">
               <div className="flex flex-col gap-1">
                 <div className="flex gap-2">
@@ -88,15 +74,14 @@ export function EscpLabPage() {
                   variant="outline"
                   size="sm"
                   onClick={handlePrint}
-                  disabled={!nota || !effectiveBusiness}
                 >
                   <PrinterIcon />
                   Print {ESCP_VARIANTS[variant].label}
                 </Button>
               </div>
               <EscpContent
-                nota={nota ?? null}
-                business={effectiveBusiness ?? null}
+                nota={nota}
+                business={effectiveBusiness}
                 docType={docType}
                 className="min-h-0 flex-1"
               />

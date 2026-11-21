@@ -1,6 +1,4 @@
-import { buildNotaEscpLines, type NotaDocType } from '@/lib/notaEscp'
-import type { Business } from '@/lib/business'
-import type { NotaDetail } from '@/lib/nota'
+import { buildNotaEscpLines, type Business, type NotaDetail, type NotaDocType } from '@/lib/notaEscp'
 
 export function EscpContent({
   nota,
