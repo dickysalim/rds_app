@@ -65,7 +65,7 @@ const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 // Closing-rule drop below the last item's row, in 1/216" (ESC J units). One
 // full text line at 1/6" spacing is 36; 0 sits flush on the item text, 36 is
 // a whole row away. Tune this one number to move the rule up or down.
-export const OVERPRINT_DROP = 12
+export const OVERPRINT_DROP = 8
 export const LINE_UNITS = 36
 
 const BOX_WIDTH = 20
