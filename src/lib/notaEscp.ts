@@ -67,9 +67,14 @@ const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 // a whole row away. Tune this one number to move the rule up or down.
 export const OVERPRINT_DROP = 8
 export const LINE_UNITS = 36
-// Wider drop for the rule that closes the customer block, standing in for the
-// small blank that used to sit above it.
-export const OVERPRINT_DROP_WIDE = 16
+// Rule that closes the customer block (top of the items table), in 1/216":
+//  - DROP below the last customer row = the gap the title ("NOTA PEMBELIAN")
+//    has under the letterhead rule above it (33).
+//  - AFTER = feed from that rule to the table header row, sized so the header
+//    text clears the rule by the same 8 it has above the rule below it (29 =
+//    8 + ~21 of glyph height).
+export const CUSTOMER_RULE_DROP = 33
+export const CUSTOMER_RULE_AFTER = 29
 // Extra feed after the closing rule so the line below (Subtotal) clears it by
 // the same gap the rule has under the last item.
 export const OVERPRINT_GAP_AFTER = 8
@@ -81,7 +86,10 @@ export const BLANK_UNITS = 18
 // fallback and the printer bytes all derive from this, so they can't drift.
 export function lineUnits(l: EscpLine): number {
   if (l.blank) return BLANK_UNITS
-  if (l.overprint) return LINE_UNITS + OVERPRINT_GAP_AFTER
+  if (l.overprint) {
+    const drop = l.overprintDrop ?? OVERPRINT_DROP
+    return drop + (l.overprintAfter ?? LINE_UNITS - drop + OVERPRINT_GAP_AFTER)
+  }
   return LINE_UNITS
 }
 
@@ -164,6 +172,7 @@ export type EscpLine = {
   // of its own it always looks a full line away from the item above.
   overprint?: string
   overprintDrop?: number // override OVERPRINT_DROP for this line's overprint
+  overprintAfter?: number // override the feed after the overprint (default: rest of the line + OVERPRINT_GAP_AFTER)
   // Separator row: advances only BLANK_UNITS instead of a full text line.
   blank?: boolean
 }
@@ -217,11 +226,12 @@ export function buildNotaEscpLines(
   variant: EscpVariant = 'type1',
 ): EscpLine[] {
   const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
-  const closeTableRule = (drop?: number) => {
+  const closeTableRule = (drop?: number, after?: number) => {
     const last = lines[lines.length - 1]
     if (closeTable && nota.items.length > 0 && last) {
       last.overprint = rule
       last.overprintDrop = drop
+      last.overprintAfter = after
     }
     else push(rule)
   }
@@ -282,10 +292,9 @@ export function buildNotaEscpLines(
       push(l.trimEnd())
     }
   }
-  // Type 1: rule overprinted under the last customer row, dropped a bit further
-  // than the other rules to keep a small gap instead of a blank row.
+  // Type 1: rule overprinted under the last customer row (see CUSTOMER_RULE_*).
   if (!closeTable) pushBlank()
-  closeTableRule(OVERPRINT_DROP_WIDE)
+  closeTableRule(CUSTOMER_RULE_DROP, CUSTOMER_RULE_AFTER)
 
   // Items table
   const gap = ' '.repeat(COL_GAP)
@@ -513,7 +522,7 @@ export function buildNotaEscp(
       emit(ESC, 0x4a, drop) // ESC J n: feed n/216" down, no CR
       text(l.overprint)
       emit(0x0d) // CR
-      emit(ESC, 0x4a, LINE_UNITS - drop + OVERPRINT_GAP_AFTER) // finish the line + clear gap
+      emit(ESC, 0x4a, l.overprintAfter ?? LINE_UNITS - drop + OVERPRINT_GAP_AFTER) // finish the line + clear gap
     } else {
       emit(...CR_LF)
     }
