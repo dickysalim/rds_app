@@ -62,6 +62,12 @@ const COL_NAME_SJ = COLS - (COL_NO + COL_QTY + COL_UNIT) - COL_GAP * 3
 const META_WIDTH = 34
 const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 
+// Closing-rule drop below the last item's row, in 1/216" (ESC J units). One
+// full text line at 1/6" spacing is 36; 0 sits flush on the item text, 36 is
+// a whole row away. Tune this one number to move the rule up or down.
+export const OVERPRINT_DROP = 12
+export const LINE_UNITS = 36
+
 const BOX_WIDTH = 20
 const BOX_GAP = 2
 const PAYMENT_WIDTH = COLS - BOX_WIDTH * 2 - BOX_GAP * 2
@@ -479,9 +485,13 @@ export function buildNotaEscp(
     }
     if (l.overprint) {
       emit(0x0d) // CR only: back to column 1, same row
+      emit(ESC, 0x4a, OVERPRINT_DROP) // ESC J n: feed n/216" down, no CR
       text(l.overprint)
+      emit(0x0d) // CR
+      emit(ESC, 0x4a, LINE_UNITS - OVERPRINT_DROP) // feed the rest of the line
+    } else {
+      emit(...CR_LF)
     }
-    emit(...CR_LF)
   }
 
   // Page length in inches (ESC C 0 n), set right before the form feed it
@@ -543,7 +553,7 @@ export function printNotaEscpViaBrowser(
             .join('')
         : escapeHtml(l.text) || '&nbsp;'
       const over = l.overprint
-        ? `<span style="position:absolute;left:0;top:0">${escapeHtml(l.overprint)}</span>`
+        ? `<span style="position:absolute;left:0;top:${(OVERPRINT_DROP * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
         : ''
       return `<div style="position:relative;height:20px;${style}">${content}${over}</div>`
     })

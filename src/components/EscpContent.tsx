@@ -1,4 +1,4 @@
-import { buildNotaEscpLines, type Business, type NotaDetail, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
+import { buildNotaEscpLines, LINE_UNITS, OVERPRINT_DROP, type Business, type NotaDetail, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
 
 export function EscpContent({
   nota,
@@ -43,7 +43,11 @@ export function EscpContent({
                   </span>
                 ))
               : l.text || ' '}
-            {l.overprint && <span className="absolute left-0 top-0">{l.overprint}</span>}
+            {l.overprint && (
+              <span className="absolute left-0" style={{ top: `${(OVERPRINT_DROP * 20) / LINE_UNITS}px` }}>
+                {l.overprint}
+              </span>
+            )}
           </div>
         ))}
       </pre>
