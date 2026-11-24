@@ -1,4 +1,4 @@
-import { Receipt, Users, Package, Settings, Boxes, TrendingUp, TrendingDown, UserCog, UsersRound, Tag, Wheat, ClipboardList } from 'lucide-react'
+import { Receipt, Users, Package, Settings, Boxes, UserCog, UsersRound, Tag, Wheat, ClipboardList } from 'lucide-react'
 import { getBusinessLogoUrl } from '@/lib/business'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -31,11 +31,6 @@ const operationItems = [
   { title: 'Product', url: '/product', icon: Package },
   { title: 'Raw Mat. Management', url: '/raw-mat-management', icon: ClipboardList },
   { title: 'Raw Material', url: '/raw-material', icon: Wheat },
-]
-
-const financeItems = [
-  { title: 'Revenue', url: '/revenue', icon: TrendingUp },
-  { title: 'Expense', url: '/expense', icon: TrendingDown },
 ]
 
 const settingsItems = [
@@ -87,7 +82,6 @@ export function AppSidebar({
 
   const visibleSalesItems = salesItems.filter((item) => isPathAllowed(user.role, item.url))
   const visibleOperationItems = operationItems.filter((item) => isPathAllowed(user.role, item.url))
-  const visibleFinanceItems = financeItems.filter((item) => isPathAllowed(user.role, item.url))
   const visibleSettingsItems = settingsItems.filter((item) => isPathAllowed(user.role, item.url))
 
   return (
@@ -135,16 +129,6 @@ export function AppSidebar({
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleOperationItems.map((item) => renderItem(item, location, guardRef, navigate))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-        {visibleFinanceItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Finance</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleFinanceItems.map((item) => renderItem(item, location, guardRef, navigate))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
