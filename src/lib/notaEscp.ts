@@ -34,6 +34,42 @@ const COL_NAME_SJ = COLS - (COL_NO + COL_QTY + COL_UNIT) - COL_GAP * 3
 const META_WIDTH = 34
 const CUSTOMER_WIDTH = COLS - META_WIDTH - 2
 
+// Closing-rule drop below the last item's row, in 1/216" (ESC J units). One
+// full text line at 1/6" spacing is 36; 0 sits flush on the item text, 36 is
+// a whole row away. Tune this one number to move the rule up or down.
+export const OVERPRINT_DROP = 8
+export const LINE_UNITS = 36
+// Rule that closes the customer block (top of the items table), in 1/216":
+//  - DROP below the last customer row = the gap the title ("NOTA PEMBELIAN")
+//    has under the letterhead rule above it (33).
+//  - AFTER = feed from that rule to the table header row, sized so the header
+//    text clears the rule by the same space it has above the rule below it
+//    (measured in the preview with font metrics: 34 gives ~5.7px above vs
+//    ~5.9px below).
+export const CUSTOMER_RULE_DROP = 33
+export const CUSTOMER_RULE_AFTER = 34
+// Extra feed after the closing rule so the line below (Subtotal) clears it by
+// the same gap the rule has under the last item.
+export const OVERPRINT_GAP_AFTER = 8
+// Height of a separator (blank) row, in 1/216". A text line is LINE_UNITS (36);
+// 18 is half a line. Lower = tighter; keep it above 0.
+export const BLANK_UNITS = 18
+
+// Vertical advance of one line, in 1/216". The preview, the browser-print
+// fallback and the printer bytes all derive from this, so they can't drift.
+export function lineUnits(l: EscpLine): number {
+  if (l.blank) return BLANK_UNITS
+  if (l.overprint) {
+    const drop = l.overprintDrop ?? OVERPRINT_DROP
+    return drop + (l.overprintAfter ?? LINE_UNITS - drop + OVERPRINT_GAP_AFTER)
+  }
+  return LINE_UNITS
+}
+
+// Left column for Catatan when it sits beside the totals block; the totals
+// block keeps the remaining right-hand columns.
+const NOTES_WIDTH = 44
+
 const BOX_WIDTH = 20
 const BOX_GAP = 2
 const PAYMENT_WIDTH = COLS - BOX_WIDTH * 2 - BOX_GAP * 2
@@ -103,20 +139,82 @@ export type EscpLine = {
   wide?: boolean
   underline?: boolean
   segments?: EscpSegment[]
+  // Printed on the same row after a bare CR (no line feed), so the glyphs
+  // overstrike the row's text. Used to seat the closing rule right under the
+  // last item: an underscore sits at the bottom of its own row, so on a row
+  // of its own it always looks a full line away from the item above.
+  overprint?: string
+  overprintDrop?: number // override OVERPRINT_DROP for this line's overprint
+  overprintAfter?: number // override the feed after the overprint (default: rest of the line + OVERPRINT_GAP_AFTER)
+  // Separator row: advances only BLANK_UNITS instead of a full text line.
+  blank?: boolean
 }
 
 export type NotaDocType = 'nota_pembelian' | 'surat_jalan'
+
+// Rapid-test variants: each one changes only the printer-side ESC/P commands
+// (init codes + style on/off), not the 80-column text layout, so a user can
+// print Type 1..4 back-to-back and compare on the real printer. Edit the
+// options below to tune a type; add a type by extending this table.
+export type EscpVariant = 'type1'
+
+export type EscpVariantOptions = {
+  label: string
+  description: string
+  nlq: boolean // ESC x 1: letter quality, slower but cleaner
+  bold: boolean // honor bold lines/segments (ESC E / ESC F)
+  underline: boolean // honor underline (ESC - 1 / ESC - 0)
+  wide: boolean // honor double-width title (ESC W 1 / ESC W 0)
+  doubleStrike: boolean // ESC G: print each line twice for darker text
+  compactItems: boolean // drop the blank row between the table header rule and item 1
+  compactSignature: boolean // signature name lines share the row of the last payment line (No. Rek)
+  signatureParens: boolean // wrap the signature name line in ( )
+  compactNotes: boolean // Catatan beside the totals block (Nota Pembelian) instead of below it
+  closeTable: boolean // closing rule overprinted on the last item's row (CR, no LF) instead of its own row
+}
+
+export const ESCP_VARIANTS: Record<EscpVariant, EscpVariantOptions> = {
+  type1: {
+    label: 'Type 1',
+    description: 'NLQ, bold + underline + wide title',
+    nlq: true,
+    bold: true,
+    underline: true,
+    wide: true,
+    doubleStrike: false,
+    compactItems: true,
+    compactSignature: true,
+    signatureParens: false,
+    compactNotes: false,
+    closeTable: true,
+  },
+}
+
+export const ESCP_VARIANT_KEYS = Object.keys(ESCP_VARIANTS) as EscpVariant[]
 
 export function buildNotaEscpLines(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
 ): EscpLine[] {
+  const { compactItems, closeTable, compactSignature, signatureParens, compactNotes } = ESCP_VARIANTS[variant]
+  const closeTableRule = (drop?: number, after?: number) => {
+    const last = lines[lines.length - 1]
+    if (closeTable && nota.items.length > 0 && last) {
+      last.overprint = rule
+      last.overprintDrop = drop
+      last.overprintAfter = after
+    }
+    else push(rule)
+  }
   const isSuratJalan = docType === 'surat_jalan'
   const lines: EscpLine[] = []
   const rule = '_'.repeat(COLS)
   const push = (text: string, opts: Omit<EscpLine, 'text'> = {}) =>
     lines.push({ text: ascii(text), ...opts })
+  // Separator rows between sections: shorter than a text line (see BLANK_UNITS).
+  const pushBlank = () => lines.push({ text: '', blank: true })
 
   // Letterhead
   const name = ascii(business.business_name)
@@ -128,8 +226,8 @@ export function buildNotaEscpLines(
     .join(' - ')
   if (contact) push(contact)
   if (business.business_email) push(`Email: ${business.business_email}`)
-  push(rule)
-  push('')
+  closeTableRule()
+  pushBlank()
 
   {
     const label = isSuratJalan ? 'SURAT JALAN' : 'NOTA PEMBELIAN'
@@ -138,7 +236,7 @@ export function buildNotaEscpLines(
       text: ascii(' '.repeat(padLeft) + label),
       segments: [{ text: ' '.repeat(padLeft) }, { text: label, bold: true, underline: true }],
     })
-    push('')
+    pushBlank()
   }
 
   // Customer (left) + nota meta (right), on the same rows.
@@ -167,8 +265,9 @@ export function buildNotaEscpLines(
       push(l.trimEnd())
     }
   }
-  push('')
-  push(rule)
+  // Type 1: rule overprinted under the last customer row (see CUSTOMER_RULE_*).
+  if (!closeTable) pushBlank()
+  closeTableRule(CUSTOMER_RULE_DROP, CUSTOMER_RULE_AFTER)
 
   // Items table
   const gap = ' '.repeat(COL_GAP)
@@ -179,8 +278,8 @@ export function buildNotaEscpLines(
       ),
       { bold: true },
     )
-    push(rule)
-    push('')
+    closeTableRule()
+    if (!compactItems) pushBlank()
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME_SJ)
       nameLines.forEach((nl, i) => {
@@ -196,7 +295,7 @@ export function buildNotaEscpLines(
         )
       })
     })
-    push(rule)
+    closeTableRule()
   } else {
     push(
       [
@@ -209,8 +308,8 @@ export function buildNotaEscpLines(
       ].join(gap),
       { bold: true },
     )
-    push(rule)
-    push('')
+    closeTableRule()
+    if (!compactItems) pushBlank()
     nota.items.forEach((item, idx) => {
       const nameLines = wrap(item.item_name_snapshot, COL_NAME)
       nameLines.forEach((nl, i) => {
@@ -228,26 +327,52 @@ export function buildNotaEscpLines(
         )
       })
     })
-    push(rule)
+    closeTableRule()
     const totalLabelWidth = COLS - COL_TOTAL - COL_GAP
+    const totalsRows: { text: string; bold?: boolean }[] = []
     if (nota.pajak_name && nota.pajak_percentage != null) {
       const pajakValue = (nota.total_price * nota.pajak_percentage) / 100
-      push(`${right('Subtotal', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`)
-      push(
-        `${right(`${nota.pajak_name} (${nota.pajak_percentage}%)`, totalLabelWidth)}${gap}${right(fmt(pajakValue), COL_TOTAL)}`,
-      )
-      push(`${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price + pajakValue), COL_TOTAL)}`, {
+      totalsRows.push({ text: `${right('Subtotal', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}` })
+      totalsRows.push({
+        text: `${right(`${nota.pajak_name} (${nota.pajak_percentage}%)`, totalLabelWidth)}${gap}${right(fmt(pajakValue), COL_TOTAL)}`,
+      })
+      totalsRows.push({
+        text: `${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price + pajakValue), COL_TOTAL)}`,
         bold: true,
       })
     } else {
-      push(`${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`, {
+      totalsRows.push({
+        text: `${right('TOTAL', totalLabelWidth)}${gap}${right(fmt(nota.total_price), COL_TOTAL)}`,
         bold: true,
       })
     }
+
+    if (compactNotes && nota.notes) {
+      // Catatan sits left of the totals block, on the same rows. Long notes
+      // wrap inside NOTES_WIDTH and keep running down the left column below
+      // the totals rows (the right side just stays blank there).
+      const catatanLabel = 'Catatan : '
+      const noteLines = wrap(nota.notes, NOTES_WIDTH - catatanLabel.length)
+      const rows = Math.max(noteLines.length, totalsRows.length)
+      for (let i = 0; i < rows; i++) {
+        const leftSegs: EscpSegment[] =
+          i < noteLines.length
+            ? i === 0
+              ? [{ text: ascii(catatanLabel), bold: true }, { text: left(noteLines[i], NOTES_WIDTH - catatanLabel.length) }]
+              : [{ text: left(' '.repeat(catatanLabel.length) + noteLines[i], NOTES_WIDTH) }]
+            : [{ text: ' '.repeat(NOTES_WIDTH) }]
+        const t = totalsRows[i]
+        const segments: EscpSegment[] = [...leftSegs]
+        if (t) segments.push({ text: t.text.slice(NOTES_WIDTH), bold: t.bold })
+        lines.push({ text: ascii(segments.map((x) => x.text).join('').trimEnd()), segments })
+      }
+    } else {
+      totalsRows.forEach((t) => push(t.text, t.bold ? { bold: true } : {}))
+    }
   }
 
-  if (nota.notes) {
-    push('')
+  if (nota.notes && !(compactNotes && !isSuratJalan)) {
+    pushBlank()
     const catatanLabel = 'Catatan : '
     const wrapped = wrap(nota.notes, COLS - catatanLabel.length)
     wrapped.forEach((l, i) => {
@@ -265,7 +390,10 @@ export function buildNotaEscpLines(
   // Signature labels side by side (left) + payment info (right), on the same rows.
   const signatureBox = (label: string): string[] => {
     const blank = ' '.repeat(BOX_WIDTH)
-    const nameLine = `(${BOX_H.repeat(BOX_WIDTH - 2)})`
+    const nameLine = signatureParens ? `(${BOX_H.repeat(BOX_WIDTH - 2)})` : BOX_H.repeat(BOX_WIDTH - 2)
+    // Compact: label, two blank rows, name line. Payment block stays top-aligned
+    // with the label row, so the name line lands one row below No. Rek.
+    if (compactSignature) return [left(label, BOX_WIDTH), blank, blank, nameLine]
     return [left(label, BOX_WIDTH), blank, blank, blank, blank, nameLine]
   }
   const hormatBox = signatureBox('Hormat Kami,')
@@ -287,8 +415,8 @@ export function buildNotaEscpLines(
     }
   }
 
-  push('')
-  push('')
+  pushBlank()
+  pushBlank()
   const boxGap = ' '.repeat(BOX_GAP)
   const footerRows = Math.max(hormatBox.length, terimaBox.length, paymentLines.length)
   for (let i = 0; i < footerRows; i++) {
@@ -306,13 +434,19 @@ export function buildNotaEscpLines(
     }
   }
 
-  push('')
+  pushBlank()
 
   return lines
 }
 
-export function buildNotaEscp(nota: NotaDetail, business: Business, docType: NotaDocType = 'nota_pembelian'): Uint8Array {
-  const lines = buildNotaEscpLines(nota, business, docType)
+export function buildNotaEscp(
+  nota: NotaDetail,
+  business: Business,
+  docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
+): Uint8Array {
+  const lines = buildNotaEscpLines(nota, business, docType, variant)
+  const opt = ESCP_VARIANTS[variant]
 
   // Bytes
   const bytes: number[] = []
@@ -323,29 +457,48 @@ export function buildNotaEscp(nota: NotaDetail, business: Business, docType: Not
 
   emit(ESC, 0x40) // ESC @ — reset
   emit(ESC, 0x50) // ESC P — 10 cpi
-  emit(ESC, 0x78, 0x01) // ESC x 1 — NLQ (letter quality)
+  emit(ESC, 0x78, opt.nlq ? 0x01 : 0x00) // ESC x n — NLQ (letter quality) on/off
+  if (opt.doubleStrike) emit(ESC, 0x47) // ESC G — double-strike on
   emit(ESC, 0x32) // ESC 2 — 1/6" line spacing
 
   emit(...CR_LF) // top margin
   for (const l of lines) {
+    if (l.blank) {
+      emit(ESC, 0x4a, BLANK_UNITS) // ESC J n: feed n/216" (shorter than a full line)
+      continue
+    }
     if (l.segments) {
       for (const seg of l.segments) {
-        if (seg.bold) emit(ESC, 0x45) // bold on
-        if (seg.underline) emit(ESC, 0x2d, 0x01) // underline on
+        const bold = seg.bold && opt.bold
+        const underline = seg.underline && opt.underline
+        if (bold) emit(ESC, 0x45) // bold on
+        if (underline) emit(ESC, 0x2d, 0x01) // underline on
         text(seg.text)
-        if (seg.underline) emit(ESC, 0x2d, 0x00) // underline off
-        if (seg.bold) emit(ESC, 0x46) // bold off
+        if (underline) emit(ESC, 0x2d, 0x00) // underline off
+        if (bold) emit(ESC, 0x46) // bold off
       }
     } else {
-      if (l.bold) emit(ESC, 0x45) // bold on
-      if (l.underline) emit(ESC, 0x2d, 0x01) // ESC - 1 — underline on
-      if (l.wide) emit(ESC, 0x57, 0x01) // double width on
+      const bold = l.bold && opt.bold
+      const underline = l.underline && opt.underline
+      const wide = l.wide && opt.wide
+      if (bold) emit(ESC, 0x45) // bold on
+      if (underline) emit(ESC, 0x2d, 0x01) // ESC - 1 — underline on
+      if (wide) emit(ESC, 0x57, 0x01) // double width on
       text(l.text)
-      if (l.wide) emit(ESC, 0x57, 0x00)
-      if (l.underline) emit(ESC, 0x2d, 0x00) // underline off
-      if (l.bold) emit(ESC, 0x46) // bold off
+      if (wide) emit(ESC, 0x57, 0x00)
+      if (underline) emit(ESC, 0x2d, 0x00) // underline off
+      if (bold) emit(ESC, 0x46) // bold off
     }
-    emit(...CR_LF)
+    if (l.overprint) {
+      emit(0x0d) // CR only: back to column 1, same row
+      const drop = l.overprintDrop ?? OVERPRINT_DROP
+      emit(ESC, 0x4a, drop) // ESC J n: feed n/216" down, no CR
+      text(l.overprint)
+      emit(0x0d) // CR
+      emit(ESC, 0x4a, l.overprintAfter ?? LINE_UNITS - drop + OVERPRINT_GAP_AFTER) // finish the line + clear gap
+    } else {
+      emit(...CR_LF)
+    }
   }
 
   // Page length in inches (ESC C 0 n), set right before the form feed it
@@ -357,6 +510,7 @@ export function buildNotaEscp(nota: NotaDetail, business: Business, docType: Not
   // mid-sheet instead of at the top of the next one.
   emit(ESC, 0x43, 0x00, PAGE_LENGTH_INCHES)
   emit(FF) // eject to next page top
+  if (opt.doubleStrike) emit(ESC, 0x48) // ESC H — double-strike off
 
   return new Uint8Array(bytes)
 }
@@ -366,8 +520,9 @@ export async function printNotaEscp(
   business: Business,
   printerName?: string,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
 ): Promise<void> {
-  const bytes = buildNotaEscp(nota, business, docType)
+  const bytes = buildNotaEscp(nota, business, docType, variant)
   await printRawEscp(bytes, printerName)
 }
 
@@ -382,8 +537,9 @@ export function printNotaEscpViaBrowser(
   nota: NotaDetail,
   business: Business,
   docType: NotaDocType = 'nota_pembelian',
+  variant: EscpVariant = 'type1',
 ): void {
-  const lines = buildNotaEscpLines(nota, business, docType)
+  const lines = buildNotaEscpLines(nota, business, docType, variant)
   const rows = lines
     .map((l) => {
       const style = [
@@ -403,7 +559,10 @@ export function printNotaEscpViaBrowser(
             })
             .join('')
         : escapeHtml(l.text) || '&nbsp;'
-      return `<div style="height:20px;${style}">${content}</div>`
+      const over = l.overprint
+        ? `<span style="position:absolute;left:0;top:${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px">${escapeHtml(l.overprint)}</span>`
+        : ''
+      return `<div style="position:relative;height:${(lineUnits(l) * 20) / LINE_UNITS}px;${style}">${content}${over}</div>`
     })
     .join('')
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>

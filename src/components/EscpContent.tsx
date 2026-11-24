@@ -1,19 +1,21 @@
-import { buildNotaEscpLines, type NotaDocType } from '@/lib/notaEscp'
 import type { Business } from '@/lib/business'
 import type { NotaDetail } from '@/lib/nota'
+import { buildNotaEscpLines, LINE_UNITS, OVERPRINT_DROP, lineUnits, type EscpVariant, type NotaDocType } from '@/lib/notaEscp'
 
 export function EscpContent({
   nota,
   business,
   docType = 'nota_pembelian',
+  variant = 'type1',
   className = '',
 }: {
   nota: NotaDetail | null
   business: Business | null
   docType?: NotaDocType
+  variant?: EscpVariant
   className?: string
 }) {
-  const lines = nota && business ? buildNotaEscpLines(nota, business, docType) : []
+  const lines = nota && business ? buildNotaEscpLines(nota, business, docType, variant) : []
 
   return (
     <div className={`flex justify-center overflow-auto rounded-md border bg-white p-6 ${className}`}>
@@ -26,7 +28,8 @@ export function EscpContent({
             key={i}
             className={[l.bold && 'font-bold', l.underline && 'underline'].filter(Boolean).join(' ') || undefined}
             style={{
-              height: '20px',
+              position: 'relative',
+              height: `${(lineUnits(l) * 20) / LINE_UNITS}px`,
               ...(l.wide ? { letterSpacing: '0.12em' } : undefined),
             }}
           >
@@ -42,6 +45,11 @@ export function EscpContent({
                   </span>
                 ))
               : l.text || ' '}
+            {l.overprint && (
+              <span className="absolute left-0" style={{ top: `${((l.overprintDrop ?? OVERPRINT_DROP) * 20) / LINE_UNITS}px` }}>
+                {l.overprint}
+              </span>
+            )}
           </div>
         ))}
       </pre>
