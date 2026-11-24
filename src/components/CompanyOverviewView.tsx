@@ -70,7 +70,21 @@ function companyStatus(c: Totals): 'paid' | 'unpaid' | 'partial' {
 
 const STATUS_ORDER = { unpaid: 0, partial: 1, paid: 2 }
 
-function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
+function withRecordedPayments(list: NotaListItem[], totals: Totals, paidByCustomer: Map<number, number>): Totals {
+  const ids = Array.from(new Set(list.map((n) => n.customer_id)))
+  if (!ids.every((id) => paidByCustomer.has(id))) return totals
+  const paid = ids.reduce((sum, id) => sum + (paidByCustomer.get(id) ?? 0), 0)
+  const bill = list.reduce((sum, n) => sum + totalBillOf(n), 0)
+  return { ...totals, totalPaid: paid, totalUnpaid: Math.max(0, bill - paid) }
+}
+
+// Status rules (company level, tax included):
+//   Paid     = total bill <= paid amount
+//   Partial  = paid amount is not 0
+//   Unpaid   = paid amount is 0
+// paid = payments actually recorded for the bill (paidByCustomer); until a
+// customer's payments have loaded, the allocated nota.paid_amount stands in.
+function groupByCompany(nota: NotaListItem[], paidByCustomer: Map<number, number>): CompanyGroup[] {
   const companies = new Map<string, NotaListItem[]>()
   for (const n of nota) {
     const list = companies.get(n.customer_company_name_snapshot) ?? []
@@ -82,7 +96,7 @@ function groupByCompany(nota: NotaListItem[]): CompanyGroup[] {
     .map(([company, list]) => ({
       company,
       nota: [...list].sort((a, b) => (a.nota_date < b.nota_date ? 1 : -1)),
-      ...sumTotals(list),
+      ...withRecordedPayments(list, sumTotals(list), paidByCustomer),
     }))
     .sort(
       (a, b) =>
@@ -171,7 +185,21 @@ export function CompanyOverviewView({
     setSelectedMonth(dateRange.maxMonth)
   }, [dateRange, loading, nota.length, selectedYear, selectedMonth])
 
-  const allCompanies = useMemo(() => groupByCompany(nota), [nota])
+  // Payments actually recorded for the month's bills, per customer.
+  const customerIds = useMemo(() => Array.from(new Set(nota.map((n) => n.customer_id))), [nota])
+  const paymentQueries = useQueries({
+    queries: customerIds.map((customerId) => ({
+      queryKey: queryKeys.payments(customerId, selectedYear, selectedMonth),
+      queryFn: () => listBillPayments(customerId, selectedYear, selectedMonth),
+    })),
+  })
+  const paidByCustomer = new Map<number, number>()
+  customerIds.forEach((customerId, i) => {
+    const data = paymentQueries[i]?.data
+    if (data) paidByCustomer.set(customerId, data.reduce((sum, p) => sum + p.amount, 0))
+  })
+
+  const allCompanies = groupByCompany(nota, paidByCustomer)
   const companies = allCompanies.filter((c) => {
     if (status === 'all') return true
     return companyStatus(c) === status
@@ -179,9 +207,10 @@ export function CompanyOverviewView({
   const modalCompany = allCompanies.find((c) => c.company === openCompany) ?? null
   const modalPayments = modalCompany ? paymentsByCompany[modalCompany.company] : undefined
 
+  const detailOpen = modalCompany !== null
   useEffect(() => {
-    onDetailOpenChange?.(modalCompany !== null)
-  }, [modalCompany, onDetailOpenChange])
+    onDetailOpenChange?.(detailOpen)
+  }, [detailOpen, onDetailOpenChange])
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
   const totals = useMemo(() => sumTotals(nota), [nota])
@@ -191,21 +220,9 @@ export function CompanyOverviewView({
   const overviewTotalBill = useMemo(() => nota.reduce((sum, n) => sum + totalBillOf(n), 0), [nota])
   const totalCost = useMemo(() => nota.reduce((sum, n) => sum + n.total_cost + pajakCostOf(n), 0), [nota])
   const totalProfit = overviewTotalBill - totalCost
-  // Total Paid = the payments actually recorded for the month's bills.
-  // nota.paid_amount is capped at each nota's pre-tax price, so summing it
-  // drops the tax part of what customers paid. Until every payment list has
-  // loaded, fall back to the allocated sum.
-  const customerIds = useMemo(() => Array.from(new Set(nota.map((n) => n.customer_id))), [nota])
-  const paymentQueries = useQueries({
-    queries: customerIds.map((customerId) => ({
-      queryKey: queryKeys.payments(customerId, selectedYear, selectedMonth),
-      queryFn: () => listBillPayments(customerId, selectedYear, selectedMonth),
-    })),
-  })
-  const overviewTotalPaid = paymentQueries.every((q) => q.data)
-    ? paymentQueries.reduce((sum, q) => sum + (q.data ?? []).reduce((s, p) => s + p.amount, 0), 0)
-    : totals.totalPaid
-  const settledCompanyCount = allCompanies.filter((c) => c.totalPaid === c.totalBill).length
+  const overviewTotalPaid = allCompanies.reduce((sum, c) => sum + c.totalPaid, 0)
+  const overviewTotalUnpaid = allCompanies.reduce((sum, c) => sum + c.totalUnpaid, 0)
+  const settledCompanyCount = allCompanies.filter((c) => companyStatus(c) === 'paid').length
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 
   function shiftMonth(delta: number) {
@@ -899,7 +916,7 @@ export function CompanyOverviewView({
           <CardContent>
             <p className="text-xs text-red-800">Total Unpaid</p>
             <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-red-700">
-              {formatRupiah(totals.totalUnpaid)}
+              {formatRupiah(overviewTotalUnpaid)}
             </p>
             <p className="text-xs text-red-700">{unsettledCompanyCount} Customer Unsettled</p>
           </CardContent>
