@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
@@ -185,8 +185,26 @@ export function CompanyOverviewView({
   const monthLabel = MONTH_FORMATTER.format(new Date(selectedYear, selectedMonth - 1, 1))
 
   const totals = useMemo(() => sumTotals(nota), [nota])
-  const totalCost = useMemo(() => nota.reduce((sum, n) => sum + n.total_cost, 0), [nota])
-  const totalProfit = totals.totalBill - totalCost
+  // Overview cards mirror the table columns: Total Bill = sum of each nota's
+  // bill incl. tax, Cost = cost + tax cost, Profit = Total Bill - Cost. Paid
+  // and Unpaid are the plain per-nota sums (no tax adjustment).
+  const overviewTotalBill = useMemo(() => nota.reduce((sum, n) => sum + totalBillOf(n), 0), [nota])
+  const totalCost = useMemo(() => nota.reduce((sum, n) => sum + n.total_cost + pajakCostOf(n), 0), [nota])
+  const totalProfit = overviewTotalBill - totalCost
+  // Total Paid = the payments actually recorded for the month's bills.
+  // nota.paid_amount is capped at each nota's pre-tax price, so summing it
+  // drops the tax part of what customers paid. Until every payment list has
+  // loaded, fall back to the allocated sum.
+  const customerIds = useMemo(() => Array.from(new Set(nota.map((n) => n.customer_id))), [nota])
+  const paymentQueries = useQueries({
+    queries: customerIds.map((customerId) => ({
+      queryKey: queryKeys.payments(customerId, selectedYear, selectedMonth),
+      queryFn: () => listBillPayments(customerId, selectedYear, selectedMonth),
+    })),
+  })
+  const overviewTotalPaid = paymentQueries.every((q) => q.data)
+    ? paymentQueries.reduce((sum, q) => sum + (q.data ?? []).reduce((s, p) => s + p.amount, 0), 0)
+    : totals.totalPaid
   const settledCompanyCount = allCompanies.filter((c) => c.totalPaid === c.totalBill).length
   const unsettledCompanyCount = allCompanies.length - settledCompanyCount
 
@@ -543,8 +561,18 @@ export function CompanyOverviewView({
   if (modalCompany) {
     const company = modalCompany
     const settled = company.totalUnpaid <= 0
-    const totalCost = company.nota.reduce((sum, n) => sum + n.total_cost, 0)
-    const totalProfit = company.totalBill - totalCost
+    // Every card sums straight from this company's notas: bill incl. tax,
+    // cost incl. tax cost, profit = bill - cost, paid = sum of payments.
+    const detailTotalBill = company.nota.reduce((sum, n) => sum + totalBillOf(n), 0)
+    const totalCost = company.nota.reduce((sum, n) => sum + n.total_cost + pajakCostOf(n), 0)
+    const totalProfit = detailTotalBill - totalCost
+    // Paid = the actual payments recorded for this bill. nota.paid_amount is a
+    // waterfall allocation capped at each nota's pre-tax total_price, so it
+    // never counts the tax portion a customer actually paid. Until the payment
+    // list loads, fall back to the allocated sum.
+    const detailTotalPaid = modalPayments
+      ? modalPayments.reduce((sum, p) => sum + p.amount, 0)
+      : company.nota.reduce((sum, n) => sum + n.paid_amount, 0)
     return (
       <div className="space-y-4 pb-[40vh]">
         <Button
@@ -573,7 +601,7 @@ export function CompanyOverviewView({
             <CardContent>
               <p className="text-xs text-muted-foreground">Total Bill</p>
               <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-                {formatRupiah(company.totalBill)}
+                {formatRupiah(detailTotalBill)}
               </p>
             </CardContent>
           </Card>
@@ -603,7 +631,7 @@ export function CompanyOverviewView({
               <p
                 className={`text-[22px] leading-tight font-semibold tabular-nums break-all ${settled ? 'text-green-700' : 'text-red-700'}`}
               >
-                {formatRupiah(company.totalPaid)}
+                {formatRupiah(detailTotalPaid)}
               </p>
             </CardContent>
           </Card>
@@ -841,7 +869,7 @@ export function CompanyOverviewView({
           <CardContent>
             <p className="text-xs text-muted-foreground">Total Bill</p>
             <p className="text-[22px] leading-tight font-semibold tabular-nums break-all">
-              {formatRupiah(totals.totalBill)}
+              {formatRupiah(overviewTotalBill)}
             </p>
           </CardContent>
         </Card>
@@ -862,7 +890,7 @@ export function CompanyOverviewView({
           <CardContent>
             <p className="text-xs text-green-800">Total Paid</p>
             <p className="text-[22px] leading-tight font-semibold tabular-nums break-all text-green-700">
-              {formatRupiah(totals.totalPaid)}
+              {formatRupiah(overviewTotalPaid)}
             </p>
             <p className="text-xs text-green-700">{settledCompanyCount} Customer Settled</p>
           </CardContent>
