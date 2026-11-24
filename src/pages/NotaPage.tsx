@@ -1,6 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download, MoreHorizontal } from 'lucide-react'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   AlertDialog,
@@ -50,6 +50,7 @@ import {
   getNota,
   getPaymentEvidenceUrl,
   listBillPayments,
+  listNota,
   pajakCostOf,
   statusLabel,
   statusPillClass,
@@ -107,6 +108,55 @@ export function NotaPage() {
   })
   const nota = notaPage?.nota ?? []
   const total = notaPage?.total ?? 0
+
+  // A nota has no paid amount of its own: its status follows its company's
+  // bill for that month (customer + year + month). Bill = every nota of that
+  // company-month incl. tax; paid = payments recorded for it.
+  //   Paid = bill <= paid, Partially Paid = paid is not 0, Unpaid = paid is 0.
+  const billPeriods = useMemo(() => {
+    const seen = new Map<string, { customerId: number; year: number; month: number }>()
+    for (const n of nota) {
+      const { year, month } = billPeriodOf(n)
+      seen.set(`${n.customer_id}|${year}|${month}`, { customerId: n.customer_id, year, month })
+    }
+    return Array.from(seen.entries())
+  }, [nota])
+  const billMonths = useMemo(() => {
+    const seen = new Map<string, { year: number; month: number }>()
+    for (const [, p] of billPeriods) seen.set(`${p.year}|${p.month}`, { year: p.year, month: p.month })
+    return Array.from(seen.entries())
+  }, [billPeriods])
+  const monthQueries = useQueries({
+    queries: billMonths.map(([, { year, month }]) => {
+      const mm = String(month).padStart(2, '0')
+      const startDate = `${year}-${mm}-01`
+      const endDate = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+      return {
+        queryKey: queryKeys.notaList({ startDate, endDate }),
+        queryFn: () => listNota({ startDate, endDate }),
+      }
+    }),
+  })
+  const periodPaymentQueries = useQueries({
+    queries: billPeriods.map(([, p]) => ({
+      queryKey: queryKeys.payments(p.customerId, p.year, p.month),
+      queryFn: () => listBillPayments(p.customerId, p.year, p.month),
+    })),
+  })
+  const billState = new Map<string, { bill: number; paid: number; status: string }>()
+  billPeriods.forEach(([key, p], i) => {
+    const monthIdx = billMonths.findIndex(([, m]) => m.year === p.year && m.month === p.month)
+    const monthNota = monthQueries[monthIdx]?.data?.nota
+    const payments = periodPaymentQueries[i]?.data
+    if (!monthNota || !payments) return
+    const bill = monthNota.filter((n) => n.customer_id === p.customerId).reduce((sum, n) => sum + totalBillOf(n), 0)
+    const paid = payments.reduce((sum, pay) => sum + pay.amount, 0)
+    billState.set(key, { bill, paid, status: bill <= paid ? 'paid' : paid > 0 ? 'partial' : 'unpaid' })
+  })
+  function billKeyOf(n: NotaListItem): string {
+    const { year, month } = billPeriodOf(n)
+    return `${n.customer_id}|${year}|${month}`
+  }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const totalBillSum = nota.reduce((sum, n) => sum + totalBillOf(n), 0)
@@ -360,7 +410,9 @@ export function NotaPage() {
                       </TableCell>
                     )}
                     <TableCell>
-                      <span className={statusPillClass(n.status)}>{statusLabel(n.status)}</span>
+                      <span className={statusPillClass(billState.get(billKeyOf(n))?.status ?? n.status)}>
+                        {statusLabel(billState.get(billKeyOf(n))?.status ?? n.status)}
+                      </span>
                     </TableCell>
                     <TableCell>{n.created_by ?? '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -377,7 +429,10 @@ export function NotaPage() {
                           <DropdownMenuItem
                             onClick={() => {
                               setPaymentDialogTarget(n)
-                              setPaymentDialogDefaultAmount(n.total_price - n.paid_amount)
+                              const state = billState.get(billKeyOf(n))
+                              setPaymentDialogDefaultAmount(
+                                state ? Math.max(0, state.bill - state.paid) : n.total_price - n.paid_amount,
+                              )
                             }}
                           >
                             Add Payment
